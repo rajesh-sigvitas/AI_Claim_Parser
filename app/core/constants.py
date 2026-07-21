@@ -1,0 +1,22 @@
+from enum import Enum
+
+class InputType(str, Enum):
+    USPTO_XML = "USPTO_XML"
+    OTHER_XML = "OTHER_XML"
+    TEXT_PDF = "TEXT_PDF"
+    SCANNED_PDF = "SCANNED_PDF"
+    RAW_TEXT = "RAW_TEXT"
+
+class ClaimType(str, Enum):
+    INDEPENDENT = "INDEPENDENT"
+    DEPENDENT = "DEPENDENT"
+    MULTIPLE_DEPENDENT = "MULTIPLE_DEPENDENT"
+
+class ElementType(str, Enum):
+    PREAMBLE = "PREAMBLE"
+    TRANSITION = "TRANSITION"
+    BODY_ELEMENT = "BODY_ELEMENT"
+    ENUMERATION = "ENUMERATION"
+    WHEREIN_CLAUSE = "WHEREIN_CLAUSE"
+    NESTED_LIST = "NESTED_LIST"
+    

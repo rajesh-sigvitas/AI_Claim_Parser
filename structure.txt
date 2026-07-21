@@ -1,0 +1,97 @@
+.
+├── app
+│   ├── ai
+│   │   ├── __init__.py
+│   │   ├── llama_scout.py
+│   │   └── provider.py
+│   ├── api
+│   │   ├── dependencies.py
+│   │   ├── exceptions.py
+│   │   ├── __init__.py
+│   │   ├── models.py
+│   │   └── routes.py
+│   ├── core
+│   │   ├── config.py
+│   │   ├── constants.py
+│   │   ├── exceptions.py
+│   │   ├── __init__.py
+│   │   └── logger.py
+│   ├── extractor
+│   │   ├── factory.py
+│   │   ├── generic_xml.py
+│   │   ├── __init__.py
+│   │   ├── ocr.py
+│   │   ├── pdf.py
+│   │   ├── text.py
+│   │   └── xml.py
+│   ├── formatter
+│   │   ├── claim_formatter.py
+│   │   ├── formatter.py
+│   │   ├── __init__.py
+│   │   ├── pdf_generator.py
+│   │   └── renderer.py
+│   ├── __init__.py
+│   ├── main.py
+│   ├── models
+│   │   ├── claim.py
+│   │   ├── document.py
+│   │   ├── __init__.py
+│   │   └── parser.py
+│   ├── normalizer
+│   │   ├── cleanup.py
+│   │   ├── engine.py
+│   │   ├── headers.py
+│   │   ├── __init__.py
+│   │   ├── line_merger.py
+│   │   ├── merge_lines.py
+│   │   ├── ocr_cleanup.py
+│   │   ├── unicode.py
+│   │   └── whitespace.py
+│   ├── parser
+│   │   ├── claim_detector.py
+│   │   ├── claim_splitter.py
+│   │   ├── confidence_engine.py
+│   │   ├── confidence.py
+│   │   ├── dependency_detector.py
+│   │   ├── engine.py
+│   │   ├── enumeration_detector.py
+│   │   ├── hierarchy_builder.py
+│   │   ├── __init__.py
+│   │   ├── patterns.py
+│   │   ├── semicolon_parser.py
+│   │   └── transition_detector.py
+│   ├── services
+│   │   ├── detector.py
+│   │   ├── export_service.py
+│   │   ├── __init__.py
+│   │   └── parser_service.py
+│   ├── tests
+│   │   └── __init__.py
+│   └── utils
+│       ├── auth_util.py
+│       └── __init__.py
+├── docker-compose.yml
+├── Dockerfile
+├── .env.example
+├── output
+│   ├── text_pdf_output.pdf
+│   └── xml_file_output.pdf
+├── .pytest_cache
+│   ├── CACHEDIR.TAG
+│   ├── .gitignore
+│   ├── README.md
+│   └── v
+│       └── cache
+│           ├── lastfailed
+│           └── nodeids
+├── requirements.txt
+├── scratch_test.py
+├── structure.txt
+└── tests
+    ├── __init__.py
+    ├── test_api_routes.py
+    ├── test_parser_engine.py
+    ├── test_pdf_generator.py
+    └── test_xml_extractor.py
+
+18 directories, 77 files
