@@ -1,21 +1,94 @@
-# Virtual environment
+# =========================
+# Virtual Environments
+# =========================
 venv/
 .venv/
+env/
+ENV/
+env.bak/
+venv.bak/
 
-# Python cache
+# =========================
+# Python Cache / Compiled Files
+# =========================
 __pycache__/
 *.py[cod]
+*$py.class
+*.pyo
+*.pyd
 
-# Environment variables
+# Python bytecode
+*.pyc
+*.pyo
+*.pyd
+
+# =========================
+# Environment Variables / Secrets
+# =========================
 .env
 .env.*
+!.env.example
 
-# IDE
+# =========================
+# Testing / Coverage
+# =========================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.pyre/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+
+# =========================
+# Build / Distribution
+# =========================
+build/
+dist/
+.eggs/
+*.egg
+*.egg-info/
+pip-wheel-metadata/
+share/python-wheels/
+MANIFEST
+
+# =========================
+# Jupyter Notebook
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# IDE / Editors
+# =========================
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
+# =========================
 # Logs
+# =========================
 *.log
 
-# OS files
+# =========================
+# OS Files
+# =========================
 .DS_Store
+Thumbs.db
+
+# =========================
+# Temporary Files
+# =========================
+*.tmp
+*.temp
+.cache/
+
+# =========================
+# Project Outputs
+# =========================
+output/
