@@ -50,22 +50,7 @@ async def parse_document(file: UploadFile = File(...)):
     # if doc.pdf_path:
     #     filename = Path(doc.pdf_path).name
     #     download_endpoint = f"/api/v1/download/{filename}"
-    print(ParseResponse(
-        status="success",
-        document_type=doc.input_type.value if doc.input_type else "UNKNOWN",
-        claim_count=doc.claim_count,
-        independent_claims=len(doc.independent_claims),
-        dependent_claims=len(doc.dependent_claims),
-        ocr_used=doc.ocr_used ,
-        processing_time_ms=processing_time_ms,
-        confidence=doc.confidence_score,
-        # download_endpoint=download_endpoint,
-        pdf_generated=doc.pdf_path is not None,
-        pdf_path=doc.pdf_path,
-        claims=doc.claims,
-        metadata=doc.metadata
-    )
-)
+   
     return ParseResponse(
         status="success",
         document_type=doc.input_type.value if doc.input_type else "UNKNOWN",
