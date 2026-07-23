@@ -3,7 +3,7 @@ from typing import Dict, Any, List
 from fastapi import APIRouter, UploadFile, File, HTTPException, Path as APIPath
 from fastapi.responses import FileResponse
 from pathlib import Path
-import os
+import os 
 from app.services.parser_service import parser_service
 from app.core.config import settings
 from app.api.models import ParseResponse, BatchParseResponse, HealthResponse, MetricsResponse
