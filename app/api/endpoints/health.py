@@ -14,6 +14,8 @@ router = APIRouter()
 @router.get("/health", summary="Detailed Health Check", response_model=HealthResponse)
 async def health_check():
     import datetime
+
+    _start_time = time.time()
     uptime = str(datetime.timedelta(seconds=int(time.time() - _start_time)))
     
     return HealthResponse(
