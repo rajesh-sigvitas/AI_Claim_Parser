@@ -22,6 +22,7 @@ class Claim(BaseModel):
     number: int = Field(..., description="The numerical identifier of the claim.")
     claim_type: ClaimType = Field(..., description="Whether the claim is independent, dependent, etc.")
     parent_claim: Optional[int] = Field(None, description="The claim number this claim depends on, if any.")
+    references: List[Dict[str, Any]] = Field(default_factory=list, description="All claim references parsed from the source.")
     claim_text: str = Field("", description="The raw, unformatted text of the complete claim.")
     
     # Reconstructed parts

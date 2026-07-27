@@ -134,14 +134,27 @@ class USPTOXMLExtractor:
         num_match = re.search(r'\d+', claim_id)
         claim_number = int(num_match.group()) if num_match else 0
         
-        # Determine dependency
-        claim_ref_tag = claim_tag.find("claim-ref")
+        # Determine dependency and all references
         parent_claim = None
-        if claim_ref_tag:
-            ref_text = claim_ref_tag.get_text()
+        references = []
+        
+        all_claim_refs = claim_tag.find_all("claim-ref")
+        for ref_tag in all_claim_refs:
+            ref_text = ref_tag.get_text(strip=True)
+            idref = ref_tag.get("idref", "")
             ref_match = self.claim_ref_pattern.search(ref_text)
-            if ref_match:
-                parent_claim = int(ref_match.group(1))
+            ref_num = int(ref_match.group(1)) if ref_match else None
+            
+            if ref_num is not None:
+                # The first valid reference is typically the parent claim
+                if parent_claim is None:
+                    parent_claim = ref_num
+                
+                references.append({
+                    "text": ref_text,
+                    "claim_number": ref_num,
+                    "idref": idref
+                })
                 
         is_independent = parent_claim is None
         claim_type = ClaimType.INDEPENDENT if is_independent else ClaimType.DEPENDENT
@@ -177,6 +190,7 @@ class USPTOXMLExtractor:
             number=claim_number,
             claim_type=claim_type,
             parent_claim=parent_claim,
+            references=references,
             header=header,
             elements=elements,
             metadata=metadata

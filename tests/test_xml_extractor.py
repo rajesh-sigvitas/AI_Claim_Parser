@@ -27,6 +27,14 @@ def test_uspto_xml_extraction():
     assert claims[0].header == "A system comprising:"
     assert len(claims[0].elements) == 2
     assert claims[0].elements[0].text == "a processor;"
+    assert claims[0].references == []
     
     assert claims[1].number == 2
     assert claims[1].header == "The system of claim 1, wherein the processor is fast."
+    assert claims[1].parent_claim == 1
+    assert len(claims[1].references) == 1
+    assert claims[1].references[0] == {
+        "text": "claim 1",
+        "claim_number": 1,
+        "idref": "CLM-00001"
+    }
