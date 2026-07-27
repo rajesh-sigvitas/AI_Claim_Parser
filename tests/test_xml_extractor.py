@@ -20,7 +20,7 @@ def test_uspto_xml_extraction():
     </us-patent-grant>
     """
     extractor = USPTOXMLExtractor()
-    claims = extractor.extract(xml_content)
+    claims, metadata = extractor.extract(xml_content)
     
     assert len(claims) == 2
     assert claims[0].number == 1

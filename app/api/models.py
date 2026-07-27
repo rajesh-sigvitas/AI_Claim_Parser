@@ -5,6 +5,7 @@ from app.models.claim import Claim
 class ParseResponse(BaseModel):
     """Enhanced response for document parsing."""
     status: str
+    metadata: Dict[str, Any] = {}
     document_type: str
     claim_count: int
     independent_claims: int
@@ -19,7 +20,6 @@ class ParseResponse(BaseModel):
     json_url: Optional[str] = None
     pdf_url: Optional[str] = None
     claims: Optional[List[Claim]] = None
-    metadata: Dict[str, Any] = {}
 
 class BatchParseResponse(BaseModel):
     """Response for batch parsing."""

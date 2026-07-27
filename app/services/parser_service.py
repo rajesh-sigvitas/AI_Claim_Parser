@@ -44,12 +44,13 @@ class ParserService:
 
         if input_type == InputType.USPTO_XML:
             # USPTO XML extractor returns Claim objects directly from structured XML
-            claims = extractor.extract(raw_input)
+            claims, metadata = extractor.extract(raw_input)
             doc = ClaimDocument(
                 input_type=input_type,
                 confidence_score=100.0,
                 ocr_used=False,
                 claims=claims,
+                metadata=metadata
             )
             logger.info(f"USPTO XML extracted {len(claims)} claims.")
         else:

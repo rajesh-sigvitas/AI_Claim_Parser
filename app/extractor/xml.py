@@ -1,5 +1,5 @@
+from typing import List, Optional, Tuple, Dict, Any
 import re
-from typing import List, Optional, Tuple
 from bs4 import BeautifulSoup, Tag, NavigableString
 from app.models.claim import Claim, ClaimElement
 from app.core.constants import ClaimType, ElementType
@@ -17,9 +17,9 @@ class USPTOXMLExtractor:
         )
         self.claim_ref_pattern = re.compile(r'claim\s+(\d+)', re.IGNORECASE)
 
-    def extract(self, raw_input: bytes) -> List[Claim]:
+    def extract(self, raw_input: bytes) -> Tuple[List[Claim], Dict[str, Any]]:
         """
-        Parses USPTO XML and returns a list of fully populated Claim objects.
+        Parses USPTO XML and returns a tuple of fully populated Claim objects and document metadata.
         """
         # Parse XML using lxml backend for speed and robustness
         soup = BeautifulSoup(raw_input, "lxml-xml")
@@ -36,8 +36,81 @@ class USPTOXMLExtractor:
             
         self._validate_claims(parsed_claims)
             
-        return parsed_claims
+        metadata = self._extract_document_metadata(soup)
+            
+        return parsed_claims, metadata
 
+    def _extract_document_metadata(self, soup: BeautifulSoup) -> Dict[str, Any]:
+        """Extracts bibliographic metadata from the XML document."""
+        metadata = {
+            "title": None,
+            "application_number": None,
+            "application_date": None,
+            "publication_number": None,
+            "publication_date": None,
+            "patent_number": None,
+            "kind_code": None,
+            "country": None,
+            "language": None
+        }
+
+        def format_date(raw_date: str) -> str:
+            if raw_date and len(raw_date) == 8 and raw_date.isdigit():
+                return f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:8]}"
+            return raw_date
+
+        # Title
+        title_tag = soup.find("invention-title")
+        if title_tag:
+            metadata["title"] = title_tag.get_text(strip=True)
+
+        # 1. Document Type & Language & Status
+        root_tag = soup.find(re.compile(r'us-patent-(grant|application)'))
+        if root_tag:
+            metadata["language"] = root_tag.get("lang", "en").lower()
+            metadata["country"] = root_tag.get("country", "US")
+
+        # 2. Application No & Date
+        app_ref = soup.find("application-reference")
+        if app_ref:
+            doc_id = app_ref.find("document-id")
+            if doc_id:
+                doc_number = doc_id.find("doc-number")
+                if doc_number:
+                    metadata["application_number"] = doc_number.get_text(strip=True)
+                date = doc_id.find("date")
+                if date:
+                    metadata["application_date"] = format_date(date.get_text(strip=True))
+                if not metadata["country"]:
+                    country_tag = doc_id.find("country")
+                    if country_tag:
+                        metadata["country"] = country_tag.get_text(strip=True)
+
+        # 3. Publication No & Date, Kind Code
+        pub_ref = soup.find("publication-reference")
+        if pub_ref:
+            doc_id = pub_ref.find("document-id")
+            if doc_id:
+                doc_number = doc_id.find("doc-number")
+                if doc_number:
+                    metadata["publication_number"] = doc_number.get_text(strip=True)
+                    if root_tag and "grant" in root_tag.name:
+                        metadata["patent_number"] = metadata["publication_number"]
+                date = doc_id.find("date")
+                if date:
+                    metadata["publication_date"] = format_date(date.get_text(strip=True))
+                kind = doc_id.find("kind")
+                if kind:
+                    metadata["kind_code"] = kind.get_text(strip=True)
+                if not metadata["country"]:
+                    country_tag = doc_id.find("country")
+                    if country_tag:
+                        metadata["country"] = country_tag.get_text(strip=True)
+                    
+        if not metadata["patent_number"] and metadata["publication_number"]:
+            metadata["patent_number"] = metadata["publication_number"]
+
+        return metadata
     def _validate_claims(self, claims: List[Claim]):
         if not claims:
             return
