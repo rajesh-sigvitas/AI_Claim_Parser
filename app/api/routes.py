@@ -7,4 +7,4 @@ api_router=APIRouter()
 
 api_router.include_router(parse_doc_json.router)
 api_router.include_router(health.router)
-# api_router.include_router(doc_to_pdf.router)
+api_router.include_router(doc_to_pdf.router)

@@ -20,51 +20,28 @@ class PDFExtractor:
         if not raw_input or len(raw_input) < 10:
             raise ValueError("Invalid PDF: file is empty or too small.")
 
-        text = self._try_pymupdf(raw_input)
-        if text and text.strip():
-            return text
-
-        text = self._try_pdfplumber(raw_input)
+        text = self._try_pypdf(raw_input)
         if text and text.strip():
             return text
 
         raise ValueError("PDF extraction failed: no selectable text found. Document may be scanned.")
 
     @staticmethod
-    def _try_pymupdf(raw_input: bytes) -> str:
-        """Attempts extraction using PyMuPDF (fitz)."""
+    def _try_pypdf(raw_input: bytes) -> str:
+        """Attempts extraction using pypdf."""
         try:
-            import fitz  # PyMuPDF
-            doc = fitz.open(stream=raw_input, filetype="pdf")
-            pages = []
-            for page in doc:
-                pages.append(page.get_text())
-            doc.close()
-            return "\n".join(pages)
-        except ImportError:
-            logger.warning("PyMuPDF not installed. Falling back to pdfplumber.")
-            return ""
-        except Exception as e:
-            logger.warning(f"PyMuPDF extraction failed: {e}")
-            return ""
-
-    @staticmethod
-    def _try_pdfplumber(raw_input: bytes) -> str:
-        """Attempts extraction using pdfplumber."""
-        try:
-            import pdfplumber
+            import pypdf
             import io
-            pdf = pdfplumber.open(io.BytesIO(raw_input))
+            reader = pypdf.PdfReader(io.BytesIO(raw_input))
             pages = []
-            for page in pdf.pages:
+            for page in reader.pages:
                 text = page.extract_text()
                 if text:
                     pages.append(text)
-            pdf.close()
             return "\n".join(pages)
         except ImportError:
-            logger.warning("pdfplumber not installed.")
+            logger.warning("pypdf not installed.")
             return ""
         except Exception as e:
-            logger.warning(f"pdfplumber extraction failed: {e}")
+            logger.warning(f"pypdf extraction failed: {e}")
             return ""

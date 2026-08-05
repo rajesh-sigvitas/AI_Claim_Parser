@@ -36,9 +36,14 @@ class SemicolonParser:
         elements: List[SemicolonElement] = []
         for i, part in enumerate(parts):
             cleaned = part.strip()
-            # Remove leading "and" / "or" conjunctions from last element
-            cleaned = re.sub(r'^\s*(?:and|or)\s+', '', cleaned, flags=re.IGNORECASE)
-            cleaned = cleaned.strip()
+            
+            # If this part starts with "and" or "or", we append it to the previous element
+            match = re.match(r'^\s*(and|or)\s+', cleaned, flags=re.IGNORECASE)
+            if match and elements:
+                conjunction = match.group(1)
+                elements[-1].text = f"{elements[-1].text} {conjunction}"
+                cleaned = cleaned[match.end():].strip()
+                
             if cleaned:
                 elements.append(SemicolonElement(text=cleaned, order=i))
 

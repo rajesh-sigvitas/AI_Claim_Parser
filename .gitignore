@@ -92,3 +92,5 @@ Thumbs.db
 # Project Outputs
 # =========================
 output/
+frontend/
+exe_doc/

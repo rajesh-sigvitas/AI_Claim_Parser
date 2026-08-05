@@ -6,6 +6,7 @@ class InputType(str, Enum):
     TEXT_PDF = "TEXT_PDF"
     SCANNED_PDF = "SCANNED_PDF"
     RAW_TEXT = "RAW_TEXT"
+    MICROSOFT_WORD = "MICROSOFT_WORD"
 
 class ClaimType(str, Enum):
     INDEPENDENT = "INDEPENDENT"

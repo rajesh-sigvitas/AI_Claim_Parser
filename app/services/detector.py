@@ -33,7 +33,16 @@ class FileTypeDetector:
                 return InputType.USPTO_XML, 100.0
             return InputType.OTHER_XML, 90.0
             
-        # 4. Text Detection
+        # 4. Microsoft Word Detection
+        if mime_type in (
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/x-ole-storage",
+            "application/CDFV2"
+        ) or filename.lower().endswith((".doc", ".docx")):
+            return InputType.MICROSOFT_WORD, 95.0
+            
+        # 5. Text Detection
         if mime_type == "text/plain":
             return InputType.RAW_TEXT, 100.0
             

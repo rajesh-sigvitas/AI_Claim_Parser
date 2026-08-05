@@ -4,6 +4,7 @@ Constructs the final ClaimElement tree from parsed components.
 Converts semicolon elements and enumeration items into nested ClaimElement objects
 matching the canonical model used by the XML parser.
 """
+import re
 from typing import List, Optional
 from app.models.claim import Claim, ClaimElement
 from app.core.constants import ClaimType, ElementType
@@ -141,6 +142,7 @@ class HierarchyBuilder:
             sem_items = self.semicolon_parser.parse(body)
             if len(sem_items) > 1:
                 elements = []
+                current_level = 1
                 for item in sem_items:
                     # Detect if this element itself has sub-enumerations
                     children = []
@@ -149,7 +151,7 @@ class HierarchyBuilder:
                         for j, sub in enumerate(sub_items):
                             child = ClaimElement(
                                 text=sub.text,
-                                level=sub.level + 2,
+                                level=current_level + 1,
                                 marker=sub.marker,
                                 element_type=ElementType.ENUMERATION,
                                 order=j,
@@ -173,15 +175,44 @@ class HierarchyBuilder:
                             else:
                                 text_for_element = item.text
 
-                    el = ClaimElement(
-                        text=text_for_element,
-                        level=1,
-                        marker=None,
-                        element_type=el_type,
-                        order=item.order,
-                        children=children,
-                    )
-                    elements.append(el)
+                    colon_match = re.search(r':(\s+|$)', text_for_element)
+                    if colon_match:
+                        colon_idx = colon_match.start()
+                        parent_text = text_for_element[:colon_idx + 1].strip()
+                        child_text = text_for_element[colon_idx + 1:].strip()
+
+                        el_parent = ClaimElement(
+                            text=parent_text,
+                            level=current_level,
+                            marker=None,
+                            element_type=el_type,
+                            order=item.order,
+                            children=[],
+                        )
+                        elements.append(el_parent)
+                        
+                        current_level += 1
+                        
+                        if child_text:
+                            el_child = ClaimElement(
+                                text=child_text,
+                                level=current_level,
+                                marker=None,
+                                element_type=ElementType.BODY_ELEMENT,
+                                order=item.order,
+                                children=children,
+                            )
+                            elements.append(el_child)
+                    else:
+                        el = ClaimElement(
+                            text=text_for_element,
+                            level=current_level,
+                            marker=None,
+                            element_type=el_type,
+                            order=item.order,
+                            children=children,
+                        )
+                        elements.append(el)
                 return elements
 
         # Fallback: single body element

@@ -20,10 +20,10 @@ class OCRProvider(ABC):
 
 from app.core.exceptions import OCRFailureError
 
-class DummyOCRProvider(OCRProvider):
+class TesseractOCRProvider(OCRProvider):
     """
-    Dummy provider that extracts text using pdfplumber's basic extraction
-    as a fallback when a real OCR engine like Tesseract or Llama Scout is unavailable.
+    Provider that extracts text using pdfplumber's basic extraction
+    and pytesseract for scanned pages as the primary local OCR engine.
     """
 
     def extract(self, pdf_bytes: bytes) -> str:
@@ -45,11 +45,14 @@ class DummyOCRProvider(OCRProvider):
                             ocr_text = pytesseract.image_to_string(img)
                             if ocr_text and ocr_text.strip():
                                 text.append(ocr_text)
+                            else:
+                                raise OCRFailureError(f"Tesseract returned empty text on page {page.page_number}")
                         except Exception as e:
                             logger.warning(f"Failed to OCR page {page.page_number}: {e}")
+                            raise OCRFailureError(f"Tesseract failed on page {page.page_number}: {e}")
             
             if not text:
-                raise OCRFailureError("Real OCR engine failed to process this completely scanned document or document is empty.")
+                raise OCRFailureError("Tesseract OCR engine failed to process this completely scanned document or document is empty.")
                 
             return "\n".join(text)
         except Exception as e:
@@ -65,7 +68,7 @@ class GroqOCRProvider(OCRProvider):
     def __init__(self, api_key: str):
         from groq import Groq
         self.client = Groq(api_key=api_key)
-        self.model = "meta-llama/llama-4-scout-17b-16e-instruct"
+        self.model = "qwen/qwen3.6-27b"
 
     def extract(self, pdf_bytes: bytes) -> str:
         import pdfplumber
@@ -125,6 +128,30 @@ class GroqOCRProvider(OCRProvider):
                 raise
             raise OCRFailureError(f"Groq OCR extraction failed: {str(e)}")
 
+class CascadeOCRProvider(OCRProvider):
+    """
+    Tries TesseractOCRProvider first. If it fails (e.g. Tesseract not installed, 
+    or poor quality), falls back to GroqOCRProvider.
+    """
+    def __init__(self, api_key: str):
+        self.tesseract = TesseractOCRProvider()
+        self.groq = GroqOCRProvider(api_key=api_key) if api_key else None
+
+    def extract(self, pdf_bytes: bytes) -> str:
+        try:
+            logger.info("Attempting Tesseract OCR extraction")
+            text = self.tesseract.extract(pdf_bytes)
+            if text and text.strip():
+                return text
+        except Exception as e:
+            logger.warning(f"Tesseract OCR failed: {e}. Falling back to Groq.")
+            
+        if self.groq:
+            logger.info("Attempting Groq Llama Vision extraction")
+            return self.groq.extract(pdf_bytes)
+            
+        raise OCRFailureError("Tesseract failed and Groq API key is not configured for fallback.")
+
 class OCRExtractor:
     """
     Extracts text from scanned PDFs using a pluggable OCR provider.
@@ -138,11 +165,7 @@ class OCRExtractor:
             self.provider = provider
         else:
             api_key = getattr(settings, "OCR_API_KEY", os.environ.get("GROQ_API_KEY", ""))
-            
-            if settings.OCR_PROVIDER == "llama_scout" and api_key:
-                self.provider = GroqOCRProvider(api_key=api_key)
-            else:
-                self.provider = DummyOCRProvider()
+            self.provider = CascadeOCRProvider(api_key=api_key)
 
     def extract(self, raw_input: bytes) -> str:
         """

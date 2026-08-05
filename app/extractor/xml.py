@@ -198,23 +198,29 @@ class USPTOXMLExtractor:
 
     def _extract_immediate_text(self, claim_text_tag: Tag) -> str:
         """Extracts text preserving internal formatting but excluding nested claim-text tags."""
-        parts = []
         allowed_tags = {"b", "i", "u", "sub", "sup"}
         
-        for child in claim_text_tag.children:
-            if isinstance(child, NavigableString):
-                parts.append(str(child))
-            elif isinstance(child, Tag):
-                if child.name == "claim-text":
-                    continue
+        def _process_node(node) -> str:
+            if isinstance(node, NavigableString):
+                return str(node)
+            elif isinstance(node, Tag):
+                if node.name == "claim-text":
+                    return ""
                 
-                if child.name in allowed_tags:
-                    # Keep valid formatting tags like <b>, <i>, <sub>, <sup>
-                    parts.append(str(child))
+                inner_text = "".join(_process_node(child) for child in node.children)
+                
+                if node.name in allowed_tags:
+                    return f"<{node.name}>{inner_text}</{node.name}>"
                 else:
-                    # Replace tags like <claim-ref> with their inner text
-                    parts.append(child.get_text())
-        
+                    return inner_text
+            return ""
+
+        parts = []
+        for child in claim_text_tag.children:
+            if isinstance(child, Tag) and child.name == "claim-text":
+                continue
+            parts.append(_process_node(child))
+            
         text = "".join(parts).strip()
         return re.sub(r'\s+', ' ', text)
 

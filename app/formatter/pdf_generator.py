@@ -7,6 +7,9 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_LEFT
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase.pdfmetrics import registerFontFamily
 
 from app.models.document import ClaimDocument
 from app.models.claim import Claim, ClaimElement
@@ -23,6 +26,27 @@ class PDFGenerator:
 
         # Standard USPTO formatting settings
         self.font_name = "Times-Roman"
+        
+        # Try to register a Unicode-capable font for fallback
+        font_dir = Path("/usr/share/fonts/truetype/dejavu")
+        self.has_fallback = False
+        if (font_dir / "DejaVuSerif.ttf").exists():
+            try:
+                pdfmetrics.registerFont(TTFont('DejaVuSerif', str(font_dir / "DejaVuSerif.ttf")))
+                pdfmetrics.registerFont(TTFont('DejaVuSerif-Bold', str(font_dir / "DejaVuSerif-Bold.ttf")))
+                pdfmetrics.registerFont(TTFont('DejaVuSerif-Italic', str(font_dir / "DejaVuSerif-Italic.ttf")))
+                pdfmetrics.registerFont(TTFont('DejaVuSerif-BoldItalic', str(font_dir / "DejaVuSerif-BoldItalic.ttf")))
+                registerFontFamily(
+                    'DejaVuSerif', 
+                    normal='DejaVuSerif', 
+                    bold='DejaVuSerif-Bold', 
+                    italic='DejaVuSerif-Italic', 
+                    boldItalic='DejaVuSerif-BoldItalic'
+                )
+                self.has_fallback = True
+            except Exception as e:
+                logger.warning(f"Failed to register DejaVuSerif fonts: {e}")
+
         self.font_size = 12
         self.leading = 14
         
@@ -169,7 +193,11 @@ class PDFGenerator:
             
     def _escape(self, text: str) -> str:
         """Escapes special characters for ReportLab XML parser."""
-        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        if getattr(self, 'has_fallback', False):
+            import re
+            text = re.sub(r'([^\x00-\x7F]+)', r'<font name="DejaVuSerif">\1</font>', text)
+        return text
         
     def _escape_and_preserve_tags(self, text: str) -> str:
         """
@@ -199,6 +227,9 @@ class PDFGenerator:
                 escaped_parts.append(part)
             else:
                 # This is text, escape < and >
-                escaped_parts.append(part.replace("<", "&lt;").replace(">", "&gt;"))
+                escaped_text = part.replace("<", "&lt;").replace(">", "&gt;")
+                if getattr(self, 'has_fallback', False):
+                    escaped_text = re.sub(r'([^\x00-\x7F]+)', r'<font name="DejaVuSerif">\1</font>', escaped_text)
+                escaped_parts.append(escaped_text)
                 
         return "".join(escaped_parts)

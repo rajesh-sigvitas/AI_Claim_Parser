@@ -25,6 +25,9 @@ class ExtractorFactory:
         elif input_type == InputType.SCANNED_PDF:
             from app.extractor.ocr import OCRExtractor
             return OCRExtractor()
+        elif input_type == InputType.MICROSOFT_WORD:
+            from app.extractor.word import WordExtractor
+            return WordExtractor()
         else:
             from app.extractor.text import TextExtractor
             return TextExtractor()
