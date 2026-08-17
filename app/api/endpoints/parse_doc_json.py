@@ -46,10 +46,10 @@ async def parse_document(file: UploadFile = File(...)):
         _metrics["ocr_usage_count"] += 1
     
     # Set download URLs if PDF generated
-    # download_endpoint = None
-    # if doc.pdf_path:
-    #     filename = Path(doc.pdf_path).name
-    #     download_endpoint = f"/api/v1/download/{filename}"
+    download_endpoint = None
+    if doc.pdf_path:
+        filename = Path(doc.pdf_path).name
+        download_endpoint = f"/api/v1/download/{filename}"
    
     return ParseResponse(
         status="success",
@@ -60,7 +60,7 @@ async def parse_document(file: UploadFile = File(...)):
         ocr_used=doc.ocr_used ,
         processing_time_ms=processing_time_ms,
         confidence=doc.confidence_score,
-        # download_endpoint=download_endpoint,
+        download_endpoint=download_endpoint,
         pdf_generated=doc.pdf_path is not None,
         pdf_path=doc.pdf_path,
         claims=doc.claims,

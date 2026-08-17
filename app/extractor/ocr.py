@@ -30,6 +30,11 @@ class TesseractOCRProvider(OCRProvider):
         import pdfplumber
         import io
         import pytesseract
+        import shutil
+        
+        # Explicitly set path to avoid PATH issues in different environments
+        tess_path = shutil.which("tesseract") or "/usr/bin/tesseract"
+        pytesseract.pytesseract.tesseract_cmd = tess_path
         try:
             text = []
             with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
