@@ -12,6 +12,7 @@ lxml==5.2.2
 python-magic==0.4.27
 PyMuPDF==1.24.5
 pdfplumber==0.11.1
+python-docx==1.1.2
 
 # OCR (Optional/Future integration)
 # llama-scout-ocr==1.0.0

@@ -6,10 +6,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
-# Install system dependencies required for PyMuPDF and Magic
+# Install system dependencies required for PyMuPDF, Magic, Word extraction, and OCR
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libmagic1 \
     build-essential \
+    libreoffice \
+    tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
