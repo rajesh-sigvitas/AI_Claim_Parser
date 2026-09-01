@@ -40,10 +40,37 @@ class NormalizationEngine:
         if text != original_text:
             operations.append("ocr_cleanup_applied")
         
-        # 4. Line Merging (Heuristic: merge lines if they don't end in punctuation or start with a number/enum)
-        # We will let the HierarchyBuilder handle specific element extraction, but we can clean up obvious mid-sentence breaks.
-        # For patent claims, it's often safer to rely on semicolons and enumerations for breaks.
-        # We'll just normalize trailing spaces.
-        text = '\n'.join(line.strip() for line in text.split('\n'))
+        # 4. Line Merging
+        # - If a line ends with a hyphen, remove the hyphen and join directly with the next line (fixes "diago- nally").
+        # - Otherwise, join with a space, unless the next line starts with a claim boundary (e.g. "2. The system...").
+        # - Or if it's a double newline, keep the paragraph break.
+        
+        # First fix hyphenated breaks
+        text = re.sub(r'([a-zA-Z])-\s*\n\s*([a-zA-Z])', r'\1\2', text)
+        
+        # Then we join lines that don't look like they begin a new claim
+        lines = text.split('\n')
+        merged_lines = []
+        claim_start = re.compile(r'^\s*(?:claim\s+)?\d+\.(?!\d)', re.IGNORECASE)
+        
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                merged_lines.append("")
+                continue
+                
+            if merged_lines and merged_lines[-1] != "":
+                # If the current line starts a new claim, don't merge it with the previous line
+                if claim_start.match(stripped):
+                    merged_lines.append(stripped)
+                else:
+                    # Merge with a space
+                    merged_lines[-1] = merged_lines[-1] + " " + stripped
+            else:
+                merged_lines.append(stripped)
+                
+        # Filter out empty lines to leave double newlines as single newlines between paragraphs
+        text = '\n'.join(merged_lines)
+        text = re.sub(r'\n{2,}', '\n\n', text)
         
         return text, operations

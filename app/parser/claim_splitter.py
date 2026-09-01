@@ -22,9 +22,9 @@ class ClaimSplitter:
     """
 
     # Pattern to find claim boundaries: a number followed by period at line start
-    # Negative lookbehind prevents matching decimals like "3.5"
+    # Negative lookahead prevents matching decimals like "3.5"
     _BOUNDARY = re.compile(
-        r'(?:^|\n)[ \t]*(?:claim[ \t]+)?(\d+)\.[ \t]*',
+        r'(?:^|\n)[ \t]*(?:claim[ \t]+)?(\d+)\.(?!\d)[ \t]*',
         re.IGNORECASE
     )
 

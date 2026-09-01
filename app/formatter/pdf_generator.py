@@ -163,7 +163,8 @@ class PDFGenerator:
         # But wait, we have `claim.formatted_text` or we can reconstruct it.
         # It's safer to reconstruct it so we can apply styles to elements.
         
-        root_text = f"{claim.number}. {claim.header}"
+        header_text = claim.header.strip() if claim.header else ""
+        root_text = f"{claim.number}. {header_text}" if header_text else f"{claim.number}."
         
         # Add root paragraph
         story.append(Paragraph(self._escape(root_text), self.styles["ClaimRoot"]))
@@ -183,7 +184,7 @@ class PDFGenerator:
         # Actually, ReportLab supports <b>, <i>, <u>, <sub>, <sup> exactly as requested!
         # We should just escape & first, then we can pass the string to Paragraph.
         # If there's a marker, reconstruct the full text for display
-        display_text = f"{el.marker} {el.text}" if el.marker else el.text
+        display_text = f"{el.marker.strip()} {el.text.strip()}" if el.marker else el.text.strip()
         safe_text = self._escape_and_preserve_tags(display_text)
         
         story.append(Paragraph(safe_text, style))
