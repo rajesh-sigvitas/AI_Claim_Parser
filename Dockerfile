@@ -6,12 +6,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
-# Install system dependencies required for PyMuPDF, Magic, Word extraction, and OCR
+# Install system dependencies required for PyMuPDF, Magic, Word extraction, OCR, and Fonts
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libmagic1 \
     build-essential \
     libreoffice \
     tesseract-ocr \
+    fonts-dejavu \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -30,5 +31,5 @@ RUN mkdir -p /app/data/uploads /app/data/outputs
 # Expose port
 EXPOSE 8000
 
-# Start server using Uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# Start server using Uvicorn (1 worker is strictly required for 512MB RAM environments)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
