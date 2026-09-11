@@ -58,6 +58,15 @@ def singularize(word: str) -> str:
     return w
 
 
+# A quantity noun leading a phrase says how many, not what: "the pair of distance
+# sensors" and "each of the pair of look-up tables" name the sensors and the tables.
+# "a pair of" is already a determiner, so without this the reference ("pair of
+# distance sensor") could never match its own introduction ("distance sensor").
+_QUANTITY_NOUN_PREFIX = re.compile(
+    r"^(?:(?:pair|set|plurality|number|group|series|array)\s+of\s+)+", re.IGNORECASE
+)
+
+
 def strip_determiner(surface_form: str) -> str:
     """Removes a leading determiner such as 'the' or 'a plurality of'."""
     term = surface_form.strip()
@@ -76,6 +85,7 @@ def normalize_term(surface_form: str) -> str:
     "the corresponding stationary rail bearings" -> "stationary rail bearing"
     """
     term = strip_determiner(surface_form.lower())
+    term = strip_determiner(_QUANTITY_NOUN_PREFIX.sub("", term))
 
     # Drop surrounding punctuation and collapse whitespace.
     term = re.sub(r"^[\s\-]+|[\s.,;:)\]]+$", "", term)

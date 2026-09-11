@@ -38,6 +38,7 @@ from app.analysis.antecedent.lexicon import (
     is_predicative_adjective,
     is_plural_form,
 )
+from app.analysis.antecedent import lexicon as _lexicon
 from app.analysis.antecedent.term_normalizer import normalize_term
 
 MAX_PHRASE_WORDS = 6
@@ -106,6 +107,30 @@ _COMPOSITION_CONNECTOR_RE = re.compile(
 )
 
 
+# "the sensors each generate sensor signals": a quantifier floating after its plural
+# subject quantifies that subject; it does not open a noun phrase.  Read as a
+# determiner, it made the verb the element ("generate sensor signals") and cut the
+# subject short ("the pair of distance" + "each").
+_FLOATING_QUANTIFIERS = {"each", "every"}
+_FLOATING_RE = re.compile(r"(?<![\w-])(each|every)\s+", re.IGNORECASE)
+_PREVIOUS_WORD_RE = re.compile(r"([A-Za-z][\w-]*)\s+$")
+
+
+def _is_floating_quantifier(text: str, position: int, determiner: str) -> bool:
+    """True when the determiner at ``position`` floats after a plural noun."""
+    if determiner not in _FLOATING_QUANTIFIERS:
+        return False
+    before = _PREVIOUS_WORD_RE.search(text[max(0, position - 60):position])
+    if not before:
+        return False
+    word = before.group(1).lower()
+    return is_plural_form(word) and word not in NP_TERMINATORS
+
+
+def _clean_word(word: str) -> str:
+    return re.sub(r"[^\w\-/']", "", word).lower()
+
+
 def _tokenize(text: str, from_pos: int, limit: int = MAX_PHRASE_WORDS):
     """Yields (word, start, end) for up to `limit` candidate phrase words."""
     out = []
@@ -145,19 +170,31 @@ def _collect_phrase(text: str, from_pos: int):
         if not bare:
             break
 
-        # Another determiner starts a new phrase.
+        # Another determiner starts a new phrase -- unless it is a quantifier
+        # floating after a plural head, which ends this phrase without being the
+        # determiner of the next one.
         det_here = _DETERMINER_RE.match(text, w_start)
         if det_here and det_here.end() > w_start:
+            determiner = re.sub(r"\s+", " ", det_here.group(0)).lower()
+            if words and _is_floating_quantifier(text, w_start, determiner):
+                break
             stopped_at_determiner = True
             break
 
-        # Closed-class function word: hard boundary.
-        if bare in NP_TERMINATORS:
+        # Closed-class function word: hard boundary.  A binding preposition is the
+        # exception: "of" holds "a level of understanding" together.
+        if bare in NP_TERMINATORS and bare not in _lexicon.NON_BREAKING_PREPOSITIONS:
             break
 
         # Adverbs never belong to a noun phrase ("the slider diagonally
         # extended toward ..." -> "the slider").
         if is_adverb(bare):
+            break
+
+        # A finite verb after the head ends the phrase: "the solid axle connects
+        # rear wheels" -> "the solid axle".  The trim below only ever looked at the
+        # last word, so a verb in the middle carried its whole object into the term.
+        if has_head_noun and is_finite_verb_s(bare):
             break
 
         # A predicative -able adjective sits outside the noun phrase -- but
@@ -179,7 +216,9 @@ def _collect_phrase(text: str, from_pos: int):
         # *identically*, which is what antecedent matching actually needs.
         # A participle in first position is kept, so "a rolling part" still
         # yields "rolling part".
-        if words and is_participle(bare):
+        # The object of a binding preposition is a noun even when it ends in -ing
+        # ("a level of understanding"), so there it does not end the phrase.
+        if words and is_participle(bare) and _clean_word(words[-1]) not in _lexicon.NON_BREAKING_PREPOSITIONS:
             break
 
         words.append(word)
@@ -212,6 +251,14 @@ def _collect_phrase(text: str, from_pos: int):
     # structural proof, so fall back to the small list of verbs that are
     # unambiguous in claim prose regardless of what follows them.
     while len(words) > 1 and is_finite_verb_s(re.sub(r"[^\w]", "", words[-1])):
+        words.pop()
+        spans.pop()
+
+    # Neither a binding preposition nor a trailing modifier can end a noun phrase:
+    # "the processor of claim 1" -> "processor", "the wheels of the vehicle together"
+    # -> "vehicle", "holding the vehicle stationary" -> "vehicle".
+    trailing = _lexicon.NON_BREAKING_PREPOSITIONS | _lexicon.TRAILING_MODIFIERS
+    while len(words) > 1 and _clean_word(words[-1]) in trailing:
         words.pop()
         spans.pop()
 
@@ -280,6 +327,9 @@ def _extract_determiner_terms(text: str, covered: List[tuple]) -> List[Extracted
             continue
 
         determiner = re.sub(r"\s+", " ", m.group(0)).lower()
+        if _is_floating_quantifier(text, m.start(), determiner):
+            continue  # "the sensors each generate ...": not a determiner here
+
         phrase = _collect_phrase(text, m.end())
         if not phrase:
             continue
@@ -345,11 +395,14 @@ _GERUND_RE = re.compile(r"(?<![\w-])([A-Za-z]+ing)(?![\w-])")
 
 
 def _is_gerund(word: str) -> bool:
-    """A verbal -ing form: not a noun like "housing", not "comprising"/"being"."""
+    """
+    A verbal -ing form: not a noun like "housing", not "comprising"/"being", and
+    not a non-term such as the list pointer "following".
+    """
     w = word.lower()
     return (
         len(w) > 4 and w.endswith("ing")
-        and w not in NOMINAL_ING_ED and w not in NP_TERMINATORS
+        and w not in NOMINAL_ING_ED and w not in NP_TERMINATORS and w not in NON_TERMS
     )
 
 
@@ -371,6 +424,10 @@ def _implicit_anchor_positions(text: str) -> Dict[int, str]:
         mark(m.end(), NOUN_POSITION)
     for m in _COMPOSITION_CONNECTOR_RE.finditer(text):
         mark(m.end(), NOUN_POSITION)
+    # After a floating quantifier comes the verb: "the sensors each | generate ...".
+    for m in _FLOATING_RE.finditer(text):
+        if _is_floating_quantifier(text, m.start(), m.group(1).lower()):
+            mark(m.end(), VERB_POSITION)
     for m in _GERUND_RE.finditer(text):
         if _is_gerund(m.group(1)):
             gap = re.match(r"\s+", text[m.end():])

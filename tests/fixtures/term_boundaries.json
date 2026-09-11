@@ -1,0 +1,90 @@
+{
+  "fixture_id": "term_boundaries",
+  "purpose": "Stage 2b regression fixture. A term span must end at the real noun-phrase boundary: not swallow the next word ('the vehicle together'), and not stop early at a binding preposition ('a level of understanding' -> 'level'). The us12677034 fixture does not exercise this. Each case lists terms that must be extracted, as [kind, normalized], and over-grouped or truncated forms that must not be.",
+
+  "cases": [
+    {
+      "id": "conjunction-and",
+      "text": "a vehicle and a trailer coupled to the vehicle",
+      "expect": [["INTRO", "vehicle"], ["INTRO", "trailer"], ["REF", "vehicle"]],
+      "forbid": ["vehicle and"]
+    },
+    {
+      "id": "conjunction-or",
+      "text": "a spring or a clip, wherein the spring is steel",
+      "expect": [["INTRO", "spring"], ["INTRO", "clip"], ["REF", "spring"]],
+      "forbid": ["spring or"]
+    },
+    {
+      "id": "of-binds-level-of-understanding",
+      "text": "determining a level of understanding of a category; and storing the level of understanding",
+      "expect": [["INTRO", "level of understanding"], ["REF", "level of understanding"]],
+      "forbid": ["level", "level of understanding of"]
+    },
+    {
+      "id": "of-plurality-of-pins",
+      "text": "a plurality of pins, wherein the pins are metal",
+      "expect": [["INTRO", "pin"], ["REF", "pin"]],
+      "forbid": ["plurality", "plurality of pin"]
+    },
+    {
+      "id": "of-quantity-noun-reference",
+      "text": "a pair of distance sensors; and a controller coupled to the pair of distance sensors",
+      "expect": [["INTRO", "distance sensor"], ["REF", "distance sensor"]],
+      "forbid": ["pair of distance sensor"]
+    },
+    {
+      "id": "of-before-determiner",
+      "text": "a frame of the vehicle and a wheel of said vehicle",
+      "expect": [["INTRO", "frame"], ["INTRO", "wheel"], ["REF", "vehicle"]],
+      "forbid": ["frame of", "wheel of"]
+    },
+    {
+      "id": "of-before-claim-reference",
+      "text": "the processor of claim 1, wherein the processor is fast",
+      "expect": [["REF", "processor"]],
+      "forbid": ["processor of"]
+    },
+    {
+      "id": "breaking-prepositions",
+      "text": "a sensor for the vehicle; a bracket with a bolt; a signal to the controller; a reading from the sensor; a pin in the housing; a label on the lid",
+      "expect": [["INTRO", "sensor"], ["INTRO", "bracket"], ["INTRO", "signal"], ["INTRO", "reading"], ["INTRO", "pin"], ["INTRO", "label"]],
+      "forbid": ["sensor for", "bracket with", "signal to", "reading from", "pin in", "label on"]
+    },
+    {
+      "id": "trailing-adverb-together",
+      "source": "US12731445 claims 1, 11, 12, 20",
+      "text": "a solid axle connecting a left wheel and a right wheel of the vehicle together;",
+      "expect": [["REF", "vehicle"]],
+      "forbid": ["vehicle together"]
+    },
+    {
+      "id": "trailing-adjective-stationary",
+      "source": "US12731445 claims 3, 13",
+      "text": "holding a wheel assembly of the vehicle stationary while a stationary rail moves",
+      "expect": [["REF", "vehicle"], ["INTRO", "stationary rail"]],
+      "forbid": ["vehicle stationary"]
+    },
+    {
+      "id": "finite-verb-mid-phrase",
+      "source": "US12731445 claim 11",
+      "text": "the solid axle connects rear wheels of the vehicle",
+      "expect": [["REF", "solid axle"]],
+      "forbid": ["solid axle connects rear wheel"]
+    },
+    {
+      "id": "floating-quantifier-each",
+      "source": "US12731445 claims 1, 12, 20",
+      "text": "the pair of distance sensors each generate sensor signals that are indicative of distances",
+      "expect": [["REF", "distance sensor"], ["INTRO", "sensor signal"]],
+      "forbid": ["pair of distance"]
+    },
+    {
+      "id": "list-pointer-the-following",
+      "source": "US12731445 claims 9, 10, 19",
+      "text": "the pair of dampers include one of the following: active dampers and semiactive dampers",
+      "expect": [["INTRO", "active damper"]],
+      "forbid": ["following"]
+    }
+  ]
+}

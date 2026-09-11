@@ -111,6 +111,23 @@ NP_TERMINATORS = (
     PREPOSITIONS | CONJUNCTIONS | SUBORDINATORS | AUXILIARIES | CLAIM_STRUCTURE_WORDS
 )
 
+# Prepositions that bind a noun phrase together instead of ending it: "a level of
+# understanding", "a range of motion".  Every other preposition ends the phrase
+# ("a sensor for the vehicle" -> "sensor").  This set is the configuration point for
+# where term spans stop; it is read at extraction time, so it can be changed without
+# touching the extractor.  A binding preposition never ends a term: "the frame of the
+# vehicle" still yields "frame", because the dangling "of" is trimmed.
+NON_BREAKING_PREPOSITIONS = {"of"}
+
+# Words that can follow a noun without belonging to it: adverbs that do not end in -ly,
+# and adjectives used predicatively or as an object complement ("connecting the wheels
+# of the vehicle together", "holding the vehicle stationary").  Trimmed only from the
+# end of a phrase; in front of the noun they are ordinary modifiers ("a stationary rail").
+TRAILING_MODIFIERS = {
+    "together", "apart", "away", "aside", "alone", "stationary", "upright", "intact",
+    "flush", "taut", "open", "closed", "parallel", "perpendicular",
+}
+
 # --------------------------------------------------------------------------
 # Morphology helpers
 # --------------------------------------------------------------------------
@@ -223,6 +240,8 @@ NON_TERMS = set(ORDINALS) | {
     "plurality", "pair", "set", "number", "one", "two", "three", "four",
     "five", "six", "seven", "eight", "nine", "ten", "least", "more", "less",
     "same", "other", "another", "such", "said", "the", "a", "an",
+    # List pointers: "one of the following: A and B" names no element of its own.
+    "following", "foregoing",
 }
 
 

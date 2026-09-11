@@ -10,6 +10,13 @@ _GLUED_ARTICLE = re.compile(
     re.IGNORECASE,
 )
 
+# A hyphen followed by a stray space inside a line: "at pre- defined distance
+# increments".  The line-wrap case ("diago-\nnally") is handled during line merging;
+# this is the same break with the newline already gone.  The hyphen is kept, since
+# term matching ignores hyphens anyway.  A suspended hyphen before "and"/"or"/"to"
+# ("left- and right-hand") is left alone.
+_BROKEN_HYPHEN = re.compile(r"\b([A-Za-z]{2,})-[ \t]+(?!(?:and|or|nor|to)\b)(?=[a-z])")
+
 # Candidate glued compounds ("usercharacteristic") and the spaced pairs that justify
 # splitting them.  A long token is only split when the same two words occur, spaced,
 # at least twice elsewhere in the text -- evidence the glued form is an extraction
@@ -109,6 +116,9 @@ class NormalizationEngine:
 
         # 5. Extraction repairs.  These run after line merging so a colon at the end of
         # a line sees the word that starts the next one.
+        text, hyphens = _BROKEN_HYPHEN.subn(r"\1-", text)
+        if hyphens:
+            operations.append(f"broken_hyphens_rejoined:{hyphens}")
         text, glued = self._split_glued_articles(text)
         if glued:
             operations.append(f"glued_articles_split:{glued}")
