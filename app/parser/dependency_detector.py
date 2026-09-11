@@ -3,22 +3,31 @@ Dependency Detector.
 Determines whether a claim is independent or dependent, and resolves parent claims.
 """
 import re
-from typing import List, Optional
+from typing import List, Set
+
 from app.parser.patterns import (
+    CLAIM_REF_GROUP,
+    CLAIM_REF_RANGE,
     DEPENDENCY_PATTERN,
-    SINGLE_CLAIM_REF,
-    RANGE_CLAIM_REF,
-    LIST_CLAIM_REF,
 )
 
 
 class DependencyResult:
     """Result of dependency detection for a single claim."""
-    __slots__ = ("is_independent", "parent_claims")
+    __slots__ = ("is_independent", "parent_claims", "is_multiple_dependent", "conjunction")
 
-    def __init__(self, is_independent: bool, parent_claims: List[int]):
+    def __init__(
+        self,
+        is_independent: bool,
+        parent_claims: List[int],
+        is_multiple_dependent: bool = False,
+        conjunction: str = "",
+    ):
         self.is_independent = is_independent
         self.parent_claims = parent_claims
+        self.is_multiple_dependent = is_multiple_dependent
+        # "and" or "or" -- 35 U.S.C. 112(e) requires the alternative form.
+        self.conjunction = conjunction
 
 
 class DependencyDetector:
@@ -30,35 +39,50 @@ class DependencyDetector:
     def detect(self, claim_text: str) -> DependencyResult:
         """
         Analyzes claim text and returns a DependencyResult.
+
+        Every claim reference in the text contributes its numbers, so "claims 1 and 2",
+        "claims 1-5" and "claim 1 or claim 3" all resolve to the full parent list rather
+        than to whichever number happened to be matched first.
         """
-        parents: List[int] = []
+        parents: Set[int] = set()
+        conjunction = ""
 
-        # 1. Check for range references first (e.g., "claims 1-5", "claims 1 through 5")
-        range_match = RANGE_CLAIM_REF.search(claim_text)
-        if range_match:
-            start_num = int(range_match.group(1))
-            end_num = int(range_match.group(2))
-            parents.extend(range(start_num, end_num + 1))
-            return DependencyResult(is_independent=False, parent_claims=parents)
+        for match in CLAIM_REF_GROUP.finditer(claim_text):
+            group = match.group(1)
+            parents.update(self._expand(group))
+            if not conjunction:
+                if re.search(r"\bor\b", group, re.IGNORECASE):
+                    conjunction = "or"
+                elif re.search(r"\band\b", group, re.IGNORECASE):
+                    conjunction = "and"
 
-        # 2. Check for explicit dependency patterns ("of claim 1", "according to claim 3")
-        dep_match = DEPENDENCY_PATTERN.search(claim_text)
-        if dep_match:
-            parents.append(int(dep_match.group(1)))
-            # Also check if there are additional claim refs in list form
-            # e.g., "The method of claim 1 or claim 3"
-            all_refs = SINGLE_CLAIM_REF.findall(claim_text)
-            for ref_num in all_refs:
-                num = int(ref_num)
-                if num not in parents:
-                    parents.append(num)
-            return DependencyResult(is_independent=False, parent_claims=sorted(set(parents)))
+        if not parents:
+            return DependencyResult(is_independent=True, parent_claims=[])
 
-        # 3. Check for any "claim N" reference (covers "The system of claim 1, ...")
-        all_single = SINGLE_CLAIM_REF.findall(claim_text)
-        if all_single:
-            parents = sorted(set(int(n) for n in all_single))
-            return DependencyResult(is_independent=False, parent_claims=parents)
+        ordered = sorted(parents)
+        return DependencyResult(
+            is_independent=False,
+            parent_claims=ordered,
+            is_multiple_dependent=len(ordered) > 1,
+            conjunction=conjunction,
+        )
 
-        # No references found → independent
-        return DependencyResult(is_independent=True, parent_claims=[])
+    @staticmethod
+    def _expand(group: str) -> Set[int]:
+        """Turns "1, 3 and 5" or "1-4" into the set of claim numbers it names."""
+        numbers: Set[int] = set()
+
+        remainder = group
+        for match in CLAIM_REF_RANGE.finditer(group):
+            start, end = int(match.group(1)), int(match.group(2))
+            if start <= end and end - start < 100:      # a sane range, not a typo
+                numbers.update(range(start, end + 1))
+                remainder = remainder.replace(match.group(0), " ")
+
+        numbers.update(int(value) for value in re.findall(r"\d+", remainder))
+        return numbers
+
+    @staticmethod
+    def has_explicit_dependency_phrase(claim_text: str) -> bool:
+        """True for "of claim 1", "according to claim 3" and the like."""
+        return bool(DEPENDENCY_PATTERN.search(claim_text))

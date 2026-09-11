@@ -53,6 +53,21 @@ DEPENDENCY_PATTERN = re.compile(
 # Single reference: "claim 1"
 SINGLE_CLAIM_REF = re.compile(r'\bclaim\s+(\d+)\b', re.IGNORECASE)
 
+# Any claim reference together with the whole list of numbers that follows it:
+# "claim 1", "claims 1 and 2", "claims 1, 3 or 5", "claims 1-5", "claims 1 through 5".
+# Capturing the list as one group is what makes a multiple dependent claim visible; a
+# pattern anchored on the singular "claim" sees only the first number, and a claim
+# depending on "claims 1 and 2" then looks independent.
+CLAIM_REF_GROUP = re.compile(
+    r'\bclaims?\s+(\d+(?:\s*(?:,|;|\band\b|\bor\b|\bthrough\b|\bto\b|-|–|—)\s*\d+)*)',
+    re.IGNORECASE
+)
+
+# Splits the captured list into its numbers, keeping the separators so ranges expand.
+CLAIM_REF_RANGE = re.compile(
+    r'(\d+)\s*(?:-|–|—|\bthrough\b|\bto\b)\s*(\d+)', re.IGNORECASE
+)
+
 # Range reference: "claims 1-5", "claims 1 through 5"
 RANGE_CLAIM_REF = re.compile(
     r'\bclaims?\s+(\d+)\s*(?:-|to|through)\s*(\d+)\b',

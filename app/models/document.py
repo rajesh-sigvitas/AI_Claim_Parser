@@ -38,10 +38,10 @@ class ClaimDocument(BaseModel):
         """
         Builds a dependency tree mapping parent claim numbers to their children.
         """
-        tree = {c.claim_number: [] for c in self.claims if c.parent_claim is None}
+        tree: Dict[int, List[int]] = {
+            c.number: [] for c in self.claims if c.parent_claim is None
+        }
         for c in self.claims:
             if c.parent_claim is not None:
-                if c.parent_claim not in tree:
-                    tree[c.parent_claim] = []
-                tree[c.parent_claim].append(c.claim_number)
+                tree.setdefault(c.parent_claim, []).append(c.number)
         return tree

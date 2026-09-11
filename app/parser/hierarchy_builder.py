@@ -5,7 +5,7 @@ Converts semicolon elements and enumeration items into nested ClaimElement objec
 matching the canonical model used by the XML parser.
 """
 import re
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from app.models.claim import Claim, ClaimElement
 from app.core.constants import ClaimType, ElementType
 from app.parser.claim_splitter import RawClaim
@@ -30,12 +30,30 @@ class HierarchyBuilder:
     def build(self, raw_claims: List[RawClaim]) -> List[Claim]:
         """
         Converts a list of RawClaim objects into fully populated Claim objects.
+
+        Cancelled claims are split off rather than returned: their numbers collide with
+        the live claims that were renumbered into them ("[12.]" cancelled alongside
+        "12.[13.]"), and analysing text that has been struck from the application would
+        report defects in claims that no longer exist.  They are reported by
+        :meth:`build_with_cancelled` so section I can still show them as [X].
         """
-        claims: List[Claim] = []
-        for rc in raw_claims:
-            claim = self._build_single_claim(rc)
-            claims.append(claim)
+        claims, _cancelled = self.build_with_cancelled(raw_claims)
         return claims
+
+    def build_with_cancelled(
+        self, raw_claims: List[RawClaim]
+    ) -> Tuple[List[Claim], List[int]]:
+        """Returns the live claims, and the numbers of the claims marked cancelled."""
+        claims: List[Claim] = []
+        cancelled: List[int] = []
+
+        for rc in raw_claims:
+            if rc.deleted:
+                cancelled.append(rc.number)
+                continue
+            claims.append(self._build_single_claim(rc))
+
+        return claims, cancelled
 
     def _build_single_claim(self, raw: RawClaim) -> Claim:
         """Builds a single Claim from a RawClaim."""
@@ -101,6 +119,10 @@ class HierarchyBuilder:
         }
         if dep.parent_claims:
             metadata["parent_claims"] = dep.parent_claims
+        if raw.old_number is not None:
+            # The claim was renumbered by an amendment; keep the previous number so the
+            # report can explain a dependency that still refers to the old numbering.
+            metadata["old_number"] = raw.old_number
 
         return Claim(
             number=raw.number,
@@ -162,6 +184,12 @@ class HierarchyBuilder:
                     # Detect wherein clauses
                     if item.text.lower().startswith("wherein"):
                         el_type = ElementType.WHEREIN_CLAUSE
+                        # A wherein clause qualifies the claim as a whole, so it
+                        # closes any sub-list opened by an earlier colon instead
+                        # of inheriting its depth.  Without this reset every
+                        # colon pushed the rest of the claim one level deeper,
+                        # so late elements drifted far to the right.
+                        current_level = 1
 
                     text_for_element = item.text
                     if children:
@@ -190,9 +218,13 @@ class HierarchyBuilder:
                             children=[],
                         )
                         elements.append(el_parent)
-                        
-                        current_level += 1
-                        
+
+                        # Nest what follows under the colon, but never past the
+                        # third level -- deeper indents only push the text off
+                        # the right margin.
+                        current_level = min(current_level + 1, 3)
+
+
                         if child_text:
                             el_child = ClaimElement(
                                 text=child_text,

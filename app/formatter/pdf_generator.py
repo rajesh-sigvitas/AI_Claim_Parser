@@ -86,29 +86,59 @@ class PDFGenerator:
             )
         }
         
-        # Create styles for elements with varying indentation levels
+        # Create styles for elements with varying indentation levels.
+        # Level 1 sits at 24pt, i.e. flush with the claim body, and every deeper
+        # level steps in by another 24pt.
+        #
+        # Two variants per level, because the hanging indent is only correct when
+        # something actually hangs in it:
+        #   - "Element_Level_N"        flat block; every line, first included,
+        #                              starts at the element indent so the text
+        #                              reads as one aligned block.
+        #   - "Element_Level_N_Marker" hanging indent for "(a)", "(i)", etc.; the
+        #                              marker sits at the element indent and the
+        #                              wrapped lines align with the text after it.
+        # Using the hanging variant for markerless elements is what used to
+        # outdent their first line and indent every wrapped line beneath it.
         for level in range(1, 10):
-            indent_pt = 24 + (level * 24)
+            indent_pt = level * 24
             custom_styles[f"Element_Level_{level}"] = ParagraphStyle(
                 f'USPTO_Element_{level}',
                 parent=base_style,
                 leftIndent=indent_pt,
-                # Simple elements don't necessarily have a marker, but if they do like (a),
-                # we don't negative indent them because the prompt shows:
-                #    (a) receiving;
-                # with the marker indented. Actually, hanging indent for elements is also standard.
-                # Let's apply hanging indent for elements so markers hang or the text wraps cleanly.
-                # If there's no marker, the hanging indent might pull the first word left.
-                # To prevent that, we just use a flat indent for elements, since elements without markers
-                # are just continued text.
-                # However, for (a), (i), etc., USPTO often uses hanging indent.
-                # We will just rely on exact wording and standard leftIndent.
-                # Wait, prompt: "The wrapped lines must align with the claim body, not with the claim number."
+                firstLineIndent=0,
+                spaceBefore=6
+            )
+            custom_styles[f"Element_Level_{level}_Marker"] = ParagraphStyle(
+                f'USPTO_Element_{level}_Marker',
+                parent=base_style,
+                leftIndent=indent_pt + 24,
                 firstLineIndent=-24,
                 spaceBefore=6
             )
-            
+
         return custom_styles
+
+    def _element_style(self, level: int, marker: str = None) -> ParagraphStyle:
+        """Picks the paragraph style for an element, clamping stray levels."""
+        level = max(1, min(9, level or 1))
+        if (marker or "").strip():
+            return self.styles[f"Element_Level_{level}_Marker"]
+        return self.styles[f"Element_Level_{level}"]
+
+    @staticmethod
+    def _opens_claim_line(marker: str, level: int) -> bool:
+        """
+        True when an element is really the opening text of the claim.
+
+        Some claims come back from the parser with an empty header because no
+        preamble/transition could be split off (a dependent claim whose body is
+        one semicolon list, for instance).  Rendering those as-is prints the
+        number on a line of its own with the claim text starting one line below
+        it.  A markerless top-level element is that missing opening text, so it
+        is drawn on the number's line instead.
+        """
+        return not (marker or "").strip() and (level or 1) <= 1
 
     def generate(self, claim_document: ClaimDocument, output_path: str = None) -> str:
         """
@@ -157,28 +187,35 @@ class PDFGenerator:
 
     def _build_claim_story(self, claim: Claim, story: list):
         """Adds a single claim to the PDF story flow."""
-        
+
         # We need to construct the root text which is the claim number + preamble + transition
         # Or if the parser didn't successfully split preamble/transition, we use raw claim_text
         # But wait, we have `claim.formatted_text` or we can reconstruct it.
         # It's safer to reconstruct it so we can apply styles to elements.
-        
+
         header_text = claim.header.strip() if claim.header else ""
+        elements = list(claim.elements)
+
+        # No header: promote the claim's first line so the number never stands
+        # alone with its text starting on the line below.
+        if not header_text and elements and self._opens_claim_line(elements[0].marker, elements[0].level):
+            lead = elements.pop(0)
+            header_text = lead.text.strip()
+            elements = list(lead.children) + elements
+
         root_text = f"{claim.number}. {header_text}" if header_text else f"{claim.number}."
-        
+
         # Add root paragraph
         story.append(Paragraph(self._escape(root_text), self.styles["ClaimRoot"]))
-        
+
         # Add elements recursively
-        for el in claim.elements:
+        for el in elements:
             self._build_element_story(el, story)
 
     def _build_element_story(self, el: ClaimElement, story: list):
         """Recursively adds elements to the story with correct indentation."""
-        # clamp level to 1-9 to avoid key errors
-        level = max(1, min(9, el.level))
-        style = self.styles[f"Element_Level_{level}"]
-        
+        style = self._element_style(el.level, el.marker)
+
         # The text might contain HTML from XML. ReportLab Paragraphs support basic XML like <b>, <i>, <sub>, <sup>.
         # But we must escape stray < and > not part of tags.
         # Actually, ReportLab supports <b>, <i>, <u>, <sub>, <sup> exactly as requested!

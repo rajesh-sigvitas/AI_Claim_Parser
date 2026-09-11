@@ -1,0 +1,104 @@
+{
+  "fixture_id": "us12677034",
+  "source": "US 12,677,034 B2 — Automated telecommunication session adjustment based on identified emotional states",
+  "claim_count": 17,
+  "purpose": "Regression fixture. The current parser reports 27 MISSING_AB errors here. Ground truth is 0 missing-AB errors. Use this to verify the introduction-rule fix does not regress.",
+
+  "expected_summary": {
+    "errors": 3,
+    "warnings": 2,
+    "info": 0
+  },
+
+  "expected_findings": [
+    {
+      "claim": 6,
+      "type": "AMBIGUOUS_AB",
+      "severity": "ERROR",
+      "term": "the level of understanding",
+      "reason": "Claim 1 introduces 'a level of understanding of the category'. Claim 6 introduces 'a level of understanding of the first content'. The later bare reference has two candidate antecedents."
+    },
+    {
+      "claim": 12,
+      "type": "AMBIGUOUS_AB",
+      "severity": "ERROR",
+      "term": "the level of understanding",
+      "reason": "Same pattern as claim 6, inherited from claim 7."
+    },
+    {
+      "claim": 17,
+      "type": "AMBIGUOUS_AB",
+      "severity": "ERROR",
+      "term": "the level of understanding",
+      "reason": "Same pattern as claim 6, inherited from claim 13."
+    },
+    {
+      "claim": 14,
+      "type": "POSSIBLY_MISSING_AB",
+      "severity": "WARNING",
+      "term": "the adjusting",
+      "reason": "Claim 13 recites 'automatically adjusting a parameter'. Exactly one adjusting act, so support is implied. Weak; warning only, never an error."
+    },
+    {
+      "claim": 17,
+      "type": "POSSIBLY_MISSING_AB",
+      "severity": "WARNING",
+      "term": "the adjusting",
+      "reason": "Same as claim 14."
+    }
+  ],
+
+  "must_not_flag": [
+    {
+      "term": "the telecommunication data",
+      "claims": [1, 7, 13],
+      "introduced_by": "receive telecommunication data from the first computing device",
+      "note": "Bare mass noun. Valid introduction without an indefinite article."
+    },
+    {
+      "term": "the first content",
+      "claims": [1, 3, 5, 6, 7, 9, 11, 12, 13, 15, 17],
+      "introduced_by": "provide first content to a first computing device",
+      "note": "Bare mass noun in claims 1/7/13; inherited by all dependents."
+    },
+    {
+      "term": "the third content",
+      "claims": [1, 2, 7, 8, 13, 14],
+      "introduced_by": "or third content to be presented to a second user",
+      "note": "Introduced inside an alternative branch ('A, or B'). Both branches introduce. Parser currently registers 'second content' but not 'third content' from the identical construction — investigate segmentation."
+    },
+    {
+      "term": "the mitigation information",
+      "claims": [5, 6, 11, 12, 17],
+      "introduced_by": "identify mitigation information based on the portion",
+      "note": "Bare mass noun."
+    },
+    {
+      "term": "the second content",
+      "claims": [1, 2, 7, 8, 13, 14],
+      "introduced_by": "determine one or more of second content to be presented",
+      "note": "Control case. Parser already handles this correctly; use it to isolate the third-content bug."
+    },
+    {
+      "term": "the one or more synonyms",
+      "claims": [6, 12, 17],
+      "introduced_by": "identify one or more synonyms for the portion",
+      "note": "Quantified introduction. number = indeterminate. Must not trigger NUMBER_MISMATCH."
+    }
+  ],
+
+  "known_input_corruption": [
+    "usercharacteristic — missing space, should be 'user characteristic'",
+    "ofthe moment — missing space, should be 'of the moment'",
+    "'by the first user:' — colon should be a semicolon",
+    "'and the user characteristic: and provide one or more' — colon should be a semicolon",
+    "Normalize all of these before parsing. The stray colons change limitation boundaries if the segmenter splits on ':'."
+  ],
+
+  "regression_assertions": [
+    "MISSING_AB count for this document MUST be 0",
+    "No finding may be emitted for any term listed in must_not_flag",
+    "Every emitted finding MUST carry a non-empty suggested_fix",
+    "Headline count MUST be tiered, not a single summed total"
+  ]
+}
