@@ -1,0 +1,10 @@
+
+Total findings: 8
+Claim 1: [LIMITING_PREAMBLE] a movable body (Potential limiting preamble term: Term introduced in the preamble is reused in the claim body.)
+Claim 1: [LIMITING_PREAMBLE] a stationary support (Potential limiting preamble term: Term introduced in the preamble is reused in the claim body.)
+Claim 3: [MISSING_ANTECEDENT] the corresponding stationary rail bearings (No clear antecedent found for 'the corresponding stationary rail bearings'.)
+Claim 12: [LIMITING_PREAMBLE] a movable body (Potential limiting preamble term: Term introduced in the preamble is reused in the claim body.)
+Claim 12: [LIMITING_PREAMBLE] a stationary support (Potential limiting preamble term: Term introduced in the preamble is reused in the claim body.)
+Claim 14: [LIMITING_PREAMBLE] a movable rail-side sliding part (Potential limiting preamble term: Term introduced in the preamble is reused in the claim body.)
+Claim 14: [MISSING_ANTECEDENT] the open bottom (No clear antecedent found for 'the open bottom'.)
+Claim 14: [MISSING_ANTECEDENT] the open top (No clear antecedent found for 'the open top'.)
