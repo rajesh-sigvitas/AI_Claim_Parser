@@ -72,6 +72,10 @@ def _by_head_noun(registry: TermRegistry) -> Dict[str, List[Tuple[int, Occurrenc
     for claim_number in sorted(registry.occurrences_by_claim):
         for occurrence in sorted(registry.claim_occurrences(claim_number),
                                  key=lambda o: o.sort_key):
+            if occurrence.is_gerund:
+                # A gerund names an act ("providing"), not a countable element, so
+                # it has no grammatical number to agree or disagree with.
+                continue
             noun = head_noun(occurrence.normalized_term)
             if noun:
                 grouped[noun].append((claim_number, occurrence))

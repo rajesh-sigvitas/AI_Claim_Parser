@@ -11,20 +11,22 @@ Design notes
 *  Phrase boundaries come from closed word classes plus morphology
    (see :mod:`app.analysis.antecedent.lexicon`) rather than from a list of
    verbs observed in one specimen document.
-*  Determiner-less plural noun phrases are recognised as *implicit*
-   introductions, because "stationary rail bearings disposed in the second
-   space" genuinely introduces that element and a later "the stationary rail
-   bearings" has proper antecedent basis.
+*  Determiner-less noun phrases are *implicit* introductions (spec
+   docs/antecedent-basis-spec.md, section 2): an element is introduced when it
+   appears without "the"/"said", article or not.  "receive telecommunication
+   data", "provide first content" and "..., or third content" all introduce
+   their element, exactly as "stationary rail bearings disposed in ..." does.
 *  "the first and second tracks" is expanded into "first track" and
    "second track" so that each resolves against its own introduction.
 """
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from app.analysis.antecedent.lexicon import (
     ALL_DETERMINERS,
     DISTRIBUTIVE_DETERMINERS,
+    NOMINAL_ING_ED,
     NON_TERMS,
     NP_TERMINATORS,
     ORDINALS,
@@ -52,6 +54,10 @@ class ExtractedTerm:
     end_index: int              # char offset just past the head noun
     is_reference: bool
     is_implicit: bool = False   # introduced without a determiner
+    # The gerund of a recited act ("adjusting a parameter" -> "the adjusting").
+    # Spec section 2 rates this as weak support; it is recorded so a severity
+    # tier can downgrade it later, but for now it is simply an introduction.
+    is_gerund: bool = False
     highlight_spans: List[tuple] = field(default_factory=list)
 
     def __post_init__(self):
@@ -301,33 +307,111 @@ def _extract_determiner_terms(text: str, covered: List[tuple]) -> List[Extracted
     return terms
 
 
-def _implicit_anchor_positions(text: str) -> List[int]:
+# -- determiner-less introductions ------------------------------------------
+#
+# Spec section 2: an element is introduced whenever it appears WITHOUT "the" or
+# "said"; an indefinite article is not required.  The previous rule accepted a
+# bare phrase only when its head was plural, so "receive telecommunication
+# data", "provide first content", "identify mitigation information" and
+# "..., or third content" introduced nothing, and every later "the ..." was
+# reported as a missing antecedent.
+#
+# A bare noun phrase is looked for wherever one can begin:
+#
+#   noun positions -- after a clause break, a conjunction, a composition
+#       connector ("comprising"), a preposition, or a gerund (its object);
+#   verb positions -- at the start of a limitation and after the infinitive
+#       "to", where the first word is normally the limitation's verb
+#       ("provide first content").  There the phrase is registered both whole
+#       and without its first word: which one is the element cannot be told
+#       without a parser, and registering both only ever adds support.
+#
+# "of" is deliberately not a phrase start: it binds a noun phrase together
+# ("a level of understanding") rather than beginning a new one.
+
+NOUN_POSITION = "noun"
+VERB_POSITION = "verb"
+
+_NOUN_ANCHOR_RE = re.compile(
+    r"\.\s+|,\s+|(?<![\w-])(?:and|or|nor)\s+"
+    r"|(?<![\w-])(?:for|with|from|by|via|in|on|at|into|onto|using)\s+",
+    re.IGNORECASE,
+)
+_VERB_ANCHOR_RE = re.compile(
+    r"[;:]\s+(?:(?:and|or)\s+)?|(?<![\w-])to\s+",
+    re.IGNORECASE,
+)
+_GERUND_RE = re.compile(r"(?<![\w-])([A-Za-z]+ing)(?![\w-])")
+
+
+def _is_gerund(word: str) -> bool:
+    """A verbal -ing form: not a noun like "housing", not "comprising"/"being"."""
+    w = word.lower()
+    return (
+        len(w) > 4 and w.endswith("ing")
+        and w not in NOMINAL_ING_ED and w not in NP_TERMINATORS
+    )
+
+
+def _implicit_anchor_positions(text: str) -> Dict[int, str]:
     """
-    Offsets at which a determiner-less noun phrase counts as an introduction:
-    the start of the block, after a clause break, and after a composition
-    connector such as "comprised of".
+    Offsets at which a determiner-less noun phrase may begin, each tagged as a
+    noun or a verb position.  A verb position wins when both apply, because its
+    handling is a superset of the noun handling.
     """
-    anchors = [0]
-    for m in re.finditer(r"[;:]\s+|\.\s+|(?<![\w-])and\s+|(?<![\w-])or\s+|,\s+", text):
-        anchors.append(m.end())
+    anchors: Dict[int, str] = {0: VERB_POSITION}
+
+    def mark(position: int, kind: str) -> None:
+        if anchors.get(position) != VERB_POSITION:
+            anchors[position] = kind
+
+    for m in _VERB_ANCHOR_RE.finditer(text):
+        mark(m.end(), VERB_POSITION)
+    for m in _NOUN_ANCHOR_RE.finditer(text):
+        mark(m.end(), NOUN_POSITION)
     for m in _COMPOSITION_CONNECTOR_RE.finditer(text):
-        anchors.append(m.end())
-    return sorted(set(anchors))
+        mark(m.end(), NOUN_POSITION)
+    for m in _GERUND_RE.finditer(text):
+        if _is_gerund(m.group(1)):
+            gap = re.match(r"\s+", text[m.end():])
+            if gap:
+                mark(m.end() + gap.end(), NOUN_POSITION)
+    return anchors
+
+
+def _bare_term(text: str, words: List[str], start: int, end: int) -> Optional[ExtractedTerm]:
+    """An implicit introduction for ``words``, or None when they are not a noun phrase."""
+    cleaned = [re.sub(r"[^\w\-/']", "", w).lower() for w in words]
+    if all(c in NON_TERMS for c in cleaned):
+        return None
+
+    head = re.sub(r"[^\w]", "", words[-1])
+    # "presented", "based": a participle standing alone is a verb, not an element.
+    if is_participle(head):
+        return None
+
+    normalized = normalize_term(" ".join(words))
+    if not normalized:
+        return None
+
+    return ExtractedTerm(
+        surface_form=text[start:end],
+        normalized_term=normalized,
+        determiner="",
+        number="plurality" if is_plural_form(head) else "singular",
+        start_index=start,
+        end_index=end,
+        is_reference=False,
+        is_implicit=True,
+        highlight_spans=[(start, end)],
+    )
 
 
 def _extract_implicit_terms(text: str, covered: List[tuple]) -> List[ExtractedTerm]:
-    """
-    Bare plural noun phrases at clause boundaries are introductions.
-
-    Restricting this to *plural* heads is a deliberate precision guard: bare
-    plurals ("movable rail bearings disposed in ...") are a normal way to
-    introduce an element, whereas a bare singular is almost always a fragment
-    of some other construction and treating it as an introduction would mask
-    genuine missing-antecedent errors.
-    """
+    """Determiner-less noun phrases, which introduce their element (spec section 2)."""
     terms: List[ExtractedTerm] = []
 
-    for anchor in _implicit_anchor_positions(text):
+    for anchor, kind in sorted(_implicit_anchor_positions(text).items()):
         m = _WORD_RE.search(text, anchor)
         if not m or text[anchor:m.start()].strip():
             continue
@@ -340,27 +424,67 @@ def _extract_implicit_terms(text: str, covered: List[tuple]) -> List[ExtractedTe
         if not phrase:
             continue
 
-        words, noun_start, noun_end, _ = phrase
-        head = re.sub(r"[^\w]", "", words[-1])
-        if not is_plural_form(head):
-            continue
+        words, start, end, stopped_at_determiner = phrase
+        leads_with_gerund = _is_gerund(re.sub(r"[^\w]", "", words[0]))
+        tail_start = (
+            _WORD_RE.search(text, start + len(words[0])).start() if len(words) > 1 else start
+        )
 
-        normalized = normalize_term(" ".join(words))
+        if len(words) == 1:
+            # A lone word directly before a determiner is a verb ("identify a
+            # category"); a lone gerund is left to the gerund pass.
+            if stopped_at_determiner or leads_with_gerund:
+                continue
+            candidates = [(start, words)]
+        else:
+            # A gerund leads a verb phrase, never a noun phrase: only its object
+            # is an element.  At a verb position the first word may be the verb,
+            # so the object is registered alongside the whole phrase.
+            candidates = [] if leads_with_gerund else [(start, words)]
+            if leads_with_gerund or kind == VERB_POSITION:
+                candidates.append((tail_start, words[1:]))
+
+        for phrase_start, phrase_words in candidates:
+            term = _bare_term(text, phrase_words, phrase_start, end)
+            if term:
+                terms.append(term)
+
+        # A leading gerund stays uncovered so the gerund pass can register it.
+        covered.append((tail_start if leads_with_gerund else start, end))
+
+    return terms
+
+
+def _extract_gerund_terms(text: str, covered: List[tuple]) -> List[ExtractedTerm]:
+    """
+    The gerund of a recited act introduces that act: "automatically adjusting a
+    parameter" gives antecedent basis to a later "the adjusting" (spec section 2).
+    """
+    terms: List[ExtractedTerm] = []
+
+    for m in _GERUND_RE.finditer(text):
+        word = m.group(1)
+        if not _is_gerund(word):
+            continue
+        if any(s <= m.start() < e for s, e in covered):
+            continue
+        normalized = normalize_term(word)
         if not normalized:
             continue
 
         terms.append(ExtractedTerm(
-            surface_form=text[noun_start:noun_end],
+            surface_form=word,
             normalized_term=normalized,
             determiner="",
-            number="plurality",
-            start_index=noun_start,
-            end_index=noun_end,
+            number="singular",
+            start_index=m.start(),
+            end_index=m.end(),
             is_reference=False,
             is_implicit=True,
-            highlight_spans=[(noun_start, noun_end)],
+            is_gerund=True,
+            highlight_spans=[(m.start(), m.end())],
         ))
-        covered.append((noun_start, noun_end))
+        covered.append((m.start(), m.end()))
 
     return terms
 
@@ -375,10 +499,12 @@ def extract_terms_from_text(text: str) -> List[ExtractedTerm]:
     covered: List[tuple] = []
 
     # Compounds first: they consume spans that the plain determiner scan would
-    # otherwise mis-split at the "and".
+    # otherwise mis-split at the "and".  Gerunds last, so a gerund that belongs
+    # to a noun phrase ("a sliding part") is already covered by it.
     terms = _expand_compounds(text, covered)
     terms += _extract_determiner_terms(text, covered)
     terms += _extract_implicit_terms(text, covered)
+    terms += _extract_gerund_terms(text, covered)
 
     terms.sort(key=lambda t: (t.start_index, t.end_index))
     return terms

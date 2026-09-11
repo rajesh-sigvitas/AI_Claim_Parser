@@ -18,9 +18,11 @@ conjunctions, auxiliaries, relatives) plus morphology, which generalises.
 INTRODUCTORY_DETERMINERS = [
     "at least one of",
     "at least one",
+    "at least two of",
     "at least two",
     "one or more of",
     "one or more",
+    "two or more of",
     "two or more",
     "a plurality of",
     "a number of",
@@ -32,6 +34,8 @@ INTRODUCTORY_DETERMINERS = [
     "each",
     "every",
     "multiple",
+    "several",
+    "various",
 ]
 
 REFERENTIAL_DETERMINERS = [
@@ -50,7 +54,8 @@ ALL_DETERMINERS = REFERENTIAL_DETERMINERS + INTRODUCTORY_DETERMINERS
 # Determiners that make the noun phrase plural-by-construction.
 PLURALITY_DETERMINERS = {
     "a plurality of", "the plurality of", "said plurality of",
-    "one or more", "one or more of", "two or more", "at least two",
+    "one or more", "one or more of", "two or more", "two or more of",
+    "at least two", "at least two of", "several", "various",
     "multiple", "a number of", "a set of", "a pair of", "a single pair of",
 }
 

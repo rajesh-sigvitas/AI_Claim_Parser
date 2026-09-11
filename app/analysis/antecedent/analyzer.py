@@ -78,6 +78,7 @@ class AntecedentAnalyzer:
                         char_start=term.start_index,
                         char_end=term.end_index,
                         is_implicit=term.is_implicit,
+                        is_gerund=term.is_gerund,
                         spans=list(term.highlight_spans),
                     ))
 

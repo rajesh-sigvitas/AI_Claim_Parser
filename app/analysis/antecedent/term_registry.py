@@ -33,6 +33,7 @@ class Occurrence:
     char_start: int
     char_end: int
     is_implicit: bool = False
+    is_gerund: bool = False         # weak support (spec section 2)
     spans: List[Tuple[int, int]] = field(default_factory=list)
 
     @property
