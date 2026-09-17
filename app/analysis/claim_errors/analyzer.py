@@ -11,7 +11,7 @@ from app.analysis.claim_errors.models import ClaimErrorResult, ClaimIssue
 from app.analysis.models import Severity
 from app.models.document import ClaimDocument
 
-_SEVERITY_ORDER = {Severity.ERROR: 0, Severity.WARNING: 1}
+_SEVERITY_ORDER = {Severity.ERROR: 0, Severity.WARNING: 1, Severity.INFO: 2}
 
 
 class ClaimErrorAnalyzer:
@@ -34,6 +34,7 @@ class ClaimErrorAnalyzer:
 
         for claim in document.claims:
             issues.extend(checks.check_dependencies(claim, numbers, cancelled, multiple_dependents))
+            issues.extend(checks.check_amendment_status(claim))
             issues.extend(checks.check_form(claim))
             issues.extend(checks.check_language(claim))
             issues.extend(checks.check_reference_numerals(claim))

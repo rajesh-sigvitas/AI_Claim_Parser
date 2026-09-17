@@ -16,6 +16,8 @@ from typing import Dict, Iterator, List, Optional, Set
 
 from app.analysis.antecedent.claim_walker import iter_claim_blocks
 from app.analysis.claim_errors.models import ClaimIssue, ClaimIssueType
+from app.analysis.hierarchy.classifier import split_status_marker
+from app.analysis.hierarchy.models import ClaimStatus
 from app.analysis.models import FindingLocation, Severity
 from app.core.constants import ClaimType
 from app.models.claim import Claim
@@ -70,9 +72,11 @@ _OPTIONAL_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# "and/or" is not here: it is an accepted way to recite alternatives, not an example,
+# and flagging it reported a defect in every claim that used it.
 _EXEMPLARY_PATTERN = re.compile(
     r"\b(for\s+example|e\.g\.|such\s+as|including\s+but\s+not\s+limited\s+to"
-    r"|for\s+instance|i\.e\.|et\s+cetera|etc\.|and/or)\b",
+    r"|for\s+instance|i\.e\.|et\s+cetera|etc\.)",
     re.IGNORECASE,
 )
 
@@ -232,7 +236,9 @@ def check_claim_set(document: ClaimDocument) -> Iterator[ClaimIssue]:
                 suggestion="Renumber the claims consecutively.",
             )
 
-    ordered = sorted(set(numbers))
+    # A cancelled claim keeps its number, so its number is not a gap in the sequence.
+    cancelled = {int(n) for n in (document.metadata or {}).get("cancelled_claims", [])}
+    ordered = sorted(set(numbers) | cancelled)
     expected = list(range(ordered[0], ordered[0] + len(ordered)))
     if ordered != expected:
         missing = sorted(set(expected) - set(ordered))
@@ -460,4 +466,38 @@ def check_reference_numerals(claim: Claim) -> Iterator[ClaimIssue]:
         suggestion="Write the reference numeral in parentheses, e.g. \"a housing (108)\".",
         term=numerals[0] if numerals else "",
         locations=locations,
+    )
+
+
+# -- amendment status -----------------------------------------------------------------
+
+# Status identifiers that do say a claim is being amended now.
+_AMENDMENT_STATUSES = {
+    ClaimStatus.CURRENTLY_AMENDED, ClaimStatus.WITHDRAWN_AND_AMENDED, ClaimStatus.NEW,
+}
+
+
+def check_amendment_status(claim: Claim) -> Iterator[ClaimIssue]:
+    """
+    A claim edited with tracked changes must say so in its status identifier
+    (37 CFR 1.121(c)): "(Currently Amended)", or "(New)" for an added claim.
+
+    Only claims whose tracked edits were lined up with the parsed claims carry
+    ``tracked_edits``; see :meth:`DocumentLoader._attach_tracked_edits`.
+    """
+    if not claim.metadata.get("tracked_edits"):
+        return
+
+    status, _ = split_status_marker(claim.claim_text or "")
+    if status in _AMENDMENT_STATUSES:
+        return
+
+    current = f' (it is marked "({status.label})")' if status else " (it has none)"
+    yield _issue(
+        ClaimIssueType.AMENDED_WITHOUT_STATUS, claim.number,
+        f"Claim {claim.number} is amended, but its status identifier does not reflect "
+        f"the amendment{current}.",
+        Severity.ERROR,
+        suggestion='Change the status identifier to one that indicates a current '
+                   'amendment, such as "(Currently Amended)".',
     )

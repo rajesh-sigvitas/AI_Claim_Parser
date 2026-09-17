@@ -12,6 +12,12 @@ from app.analysis.models import AntecedentFinding, FindingType
 _FALLBACKS = {
     FindingType.MISSING_ANTECEDENT:
         "Introduce this element with an indefinite article before referring to it.",
+    FindingType.POSSIBLY_MISSING_ANTECEDENT:
+        "Double-check: use the introduced wording if it is the same element, "
+        "otherwise introduce it before referring to it.",
+    FindingType.AMBIGUOUS_ANTECEDENT:
+        "Name the element the reference means, or distinguish the elements where they "
+        "are recited.",
     FindingType.REVERSE_ANTECEDENT:
         "Reorder the limitations so the element is introduced before it is referenced.",
     FindingType.SINGULAR_PLURAL:

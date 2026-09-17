@@ -40,6 +40,8 @@ from app.models.document import ClaimDocument
 STYLE_BY_TYPE = {
     FindingType.MISSING_ANTECEDENT: ("#FFD4D4", "#A61B1B", "Missing antecedent basis"),
     FindingType.REVERSE_ANTECEDENT: ("#FFE6B3", "#8A5200", "Reverse antecedent"),
+    FindingType.POSSIBLY_MISSING_ANTECEDENT:
+        ("#FFF2C2", "#7A5C00", "Possibly missing antecedent basis?"),
 }
 _DEFAULT_STYLE = ("#E6E6E6", "#333333", "Finding")
 
@@ -130,12 +132,16 @@ class AnnotatedPDFGenerator(PDFGenerator):
     def _build_header(self, document: ClaimDocument, story: list):
         missing = sum(1 for f in self.findings if f.type == FindingType.MISSING_ANTECEDENT)
         reverse = sum(1 for f in self.findings if f.type == FindingType.REVERSE_ANTECEDENT)
+        possible = sum(
+            1 for f in self.findings if f.type == FindingType.POSSIBLY_MISSING_ANTECEDENT
+        )
 
         story.append(Paragraph("Antecedent Analysis Report", self.styles["ReportTitle"]))
         story.append(Paragraph(
             f"Claims analysed: {document.claim_count} &nbsp;|&nbsp; "
             f"Findings: {len(self.findings)} "
-            f"(missing antecedent: {missing}, reverse antecedent: {reverse})",
+            f"(missing antecedent: {missing}, reverse antecedent: {reverse}, "
+            f"possibly missing: {possible})",
             self.styles["Meta"],
         ))
         story.append(Paragraph(

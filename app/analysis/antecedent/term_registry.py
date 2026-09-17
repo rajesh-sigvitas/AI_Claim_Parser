@@ -12,6 +12,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
+from app.analysis.antecedent.term_match import supports
 from app.models.claim import Claim
 from app.models.document import ClaimDocument
 
@@ -34,7 +35,17 @@ class Occurrence:
     char_end: int
     is_implicit: bool = False
     is_gerund: bool = False         # weak support (spec section 2)
+    # Other readings of the same words, where the phrase boundary was a guess
+    # (see term_extractor._collect_phrase).  Matching accepts any reading.
+    alternatives: List[str] = field(default_factory=list)
     spans: List[Tuple[int, int]] = field(default_factory=list)
+
+    @property
+    def readings(self) -> List[str]:
+        """The normalized term, then every alternative reading of the same words."""
+        return [self.normalized_term] + [
+            a for a in self.alternatives if a and a != self.normalized_term
+        ]
 
     @property
     def sort_key(self) -> Tuple[int, int]:
@@ -122,6 +133,27 @@ class TermRegistry:
         for ancestor in self.claim_ancestors.get(claim_number, []):
             found.extend(self.introductions_in_claim(ancestor, term))
         return found
+
+    def supporting_introductions(
+        self, claim_number: int, reference_term: str
+    ) -> Tuple[List[Occurrence], List[Occurrence]]:
+        """
+        (same-claim, inherited) introductions whose wording supports ``reference_term``.
+
+        Exact matches are included; so are introductions that say the same thing more
+        specifically ("a flat top surface" for "the top surface") -- see
+        :mod:`app.analysis.antecedent.term_match`.
+        """
+        def supporting(o: Occurrence) -> bool:
+            return o.kind == INTRODUCTION and any(
+                supports(reading, reference_term) for reading in o.readings
+            )
+
+        same = [o for o in self.claim_occurrences(claim_number) if supporting(o)]
+        inherited: List[Occurrence] = []
+        for ancestor in self.claim_ancestors.get(claim_number, []):
+            inherited.extend(o for o in self.claim_occurrences(ancestor) if supporting(o))
+        return same, inherited
 
     def visible_occurrences(self, claim_number: int, term: str) -> List[Occurrence]:
         """All occurrences of `term` visible to a claim, ancestors included."""

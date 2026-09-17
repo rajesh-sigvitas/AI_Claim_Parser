@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
+from typing import Optional
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Claim Parser AI"
@@ -21,6 +22,10 @@ class Settings(BaseSettings):
     # OCR
     OCR_PROVIDER: str = "llama_scout" # or "tesseract", "paddle"
     OCR_API_KEY: str = ""
+
+    # Antecedent analysis: JSON file of term-grouping overrides (spec section 5).
+    # See app/analysis/antecedent/overrides.py for the format.
+    TERM_OVERRIDES_PATH: Optional[Path] = None
     
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=True, extra="ignore")
 

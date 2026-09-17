@@ -31,11 +31,10 @@ class HierarchyBuilder:
         """
         Converts a list of RawClaim objects into fully populated Claim objects.
 
-        Cancelled claims are split off rather than returned: their numbers collide with
-        the live claims that were renumbered into them ("[12.]" cancelled alongside
-        "12.[13.]"), and analysing text that has been struck from the application would
-        report defects in claims that no longer exist.  They are reported by
-        :meth:`build_with_cancelled` so section I can still show them as [X].
+        Claims marked "(Canceled)" are split off rather than returned: their text is no
+        longer part of the application, so analysing it would report defects in claims
+        that do not exist.  They are reported by :meth:`build_with_cancelled` so the
+        report can still list them.
         """
         claims, _cancelled = self.build_with_cancelled(raw_claims)
         return claims
@@ -119,10 +118,10 @@ class HierarchyBuilder:
         }
         if dep.parent_claims:
             metadata["parent_claims"] = dep.parent_claims
-        if raw.old_number is not None:
-            # The claim was renumbered by an amendment; keep the previous number so the
-            # report can explain a dependency that still refers to the old numbering.
-            metadata["old_number"] = raw.old_number
+        if raw.rendered_number is not None:
+            # The source showed a second number beside this one ("12.[13.]"); kept so
+            # the report can explain a number the reader may see in the document.
+            metadata["rendered_number"] = raw.rendered_number
 
         return Claim(
             number=raw.number,

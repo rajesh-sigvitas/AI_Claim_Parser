@@ -105,8 +105,13 @@ TRANSITION_PATTERN = re.compile(
 )
 
 # Specifically for the main claim transition (the first structural one after preamble)
+# "comprises" is as much a transition as "comprising" ("..., which system comprises:").
+# Without it the split fell to the next listed word -- often "having" inside the first
+# body element -- and that element was read, and reported, as part of the preamble.
 PRIMARY_TRANSITION_PATTERN = re.compile(
-    r'\b(comprising|consisting\s+of|consisting\s+essentially\s+of|including|having|containing)\b',
+    r'\b(comprising|comprises|comprise|consisting\s+of|consists\s+of|consist\s+of'
+    r'|consisting\s+essentially\s+of|consists\s+essentially\s+of'
+    r'|including|having|containing)\b',
     re.IGNORECASE
 )
 

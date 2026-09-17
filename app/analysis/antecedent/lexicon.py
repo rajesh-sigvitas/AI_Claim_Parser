@@ -126,6 +126,50 @@ NON_BREAKING_PREPOSITIONS = {"of"}
 TRAILING_MODIFIERS = {
     "together", "apart", "away", "aside", "alone", "stationary", "upright", "intact",
     "flush", "taut", "open", "closed", "parallel", "perpendicular",
+    # Directional adverbs and predicate adjectives that follow the noun they describe:
+    # "folding the end segments of the outer ply rearwards", "mounted in the rack
+    # adjacent to ...", "the enrollment images separate from ...".
+    "adjacent", "separate", "even", "forward", "forwards", "rearward", "rearwards",
+    "backward", "backwards", "upward", "upwards", "downward", "downwards",
+    "inward", "inwards", "outward", "outwards", "sideways", "thereon", "therein",
+    "upstream", "downstream",
+    "thereto", "therefrom", "thereof", "therebetween", "here", "there", "herein",
+    "nearest", "closest", "farthest", "furthest",
+}
+
+# Nouns naming a property, a circumstance or a portion of something rather than a
+# claimed element.  "the time of the interruption", "the presence of the ransomware",
+# "the size of historical transaction data", "the outer surface of said sphere": MPEP
+# 2173.05(e) -- an inherent characteristic of what it belongs to needs no introduction.
+ABSTRACT_NOUNS = {
+    "time", "presence", "absence", "use", "basis", "action", "case", "start",
+    "beginning", "end", "rest", "remainder", "size", "length", "width", "height",
+    "depth", "thickness", "diameter", "radius", "circumference", "perimeter", "amount",
+    "number", "level", "rate", "duration", "degree", "extent", "magnitude", "direction",
+    "orientation", "form", "shape", "order", "sum", "total", "difference", "ratio",
+    "result", "effect", "influence", "purpose", "manner", "way", "event", "course",
+    "aid", "help", "expense", "need", "lack", "point", "moment", "instant", "area",
+    "volume", "weight", "mass", "speed", "velocity", "temperature", "pressure",
+    "frequency", "value", "quality", "quantity", "proportion", "percentage", "fraction",
+    "majority", "minority", "part", "portion", "side", "surface", "center", "centre",
+    "middle", "interior", "exterior", "inside", "outside", "top", "bottom", "front",
+    "rear", "back", "edge", "periphery", "vicinity", "location", "position", "range",
+    "content", "contents", "concentration", "composition", "state", "status",
+}
+
+# Base-form verbs that are never nouns.  After a plural head they are the clause's verb:
+# "the first and second contact beams define respective inner surfaces", "the half-nut
+# threads engage with threads of a leadscrew".
+BASE_VERBS = {
+    "define", "extend", "rotate", "connect", "engage", "allow", "enable", "retain",
+    "abut", "protrude", "traverse", "transmit", "generate", "determine", "actuate",
+    "enter", "convert", "detect", "vary", "differ", "provide", "receive", "carry",
+    "prevent", "correspond", "serve", "operate", "exert", "apply", "attach", "secure",
+    "fasten", "align", "join", "divide", "reduce", "maintain", "ensure", "require",
+    "enclose", "protect", "communicate", "cooperate", "interact", "respond",
+    "translate", "comprise", "include", "contain", "form", "have", "are", "were",
+    "extend", "overlie", "underlie", "surround", "intersect", "coincide", "face",
+    "need",
 }
 
 # --------------------------------------------------------------------------
@@ -173,6 +217,10 @@ FINITE_VERB_S = {
     "requires", "contains", "encloses", "covers", "protects", "actuates",
     "communicates", "cooperates", "interacts", "responds", "translates",
     "rolls", "slopes", "tapers", "curves", "bends",
+    "indicates", "belongs", "resides",
+    # The transition verbs never name an element, so their plural-subject form ends a
+    # noun phrase as surely as the -s form: "the page tables include at least ...".
+    "include", "comprise", "contain",
 }
 
 
@@ -245,6 +293,13 @@ NON_TERMS = set(ORDINALS) | {
 }
 
 
+# Adjectives that point back at what the previous step produced rather than narrowing
+# the element: "the resulting mixture" is "the mixture".  They never distinguish one
+# element from another, so they are dropped when a reference is matched to its
+# introduction.
+ANAPHORIC_MODIFIERS = {"resulting", "resultant"}
+
+
 # Nouns ending in -ly that must not be mistaken for adverbs.
 NOMINAL_LY = {
     "assembly", "assemblies", "supply", "supplies", "family", "families",
@@ -273,9 +328,20 @@ def is_participle(word: str) -> bool:
     return False
 
 
+# Singular nouns ending in -s that the -ss/-us/-is endings below do not catch.  Reading
+# "the lens" as a plural made it disagree with "a lens" and produced a number mismatch
+# out of two spellings of one word.  "series" and "species" are invariant: one series and
+# several series are spelled alike, so neither can contradict the other.
+SINGULAR_S_NOUNS = {
+    "lens", "gas", "bias", "series", "species", "canvas", "atlas", "iris", "trellis",
+}
+
+
 def is_plural_form(word: str) -> bool:
     """Cheap plural test for the head noun of a phrase."""
     w = word.lower()
+    if w in SINGULAR_S_NOUNS:
+        return False
     if w.endswith("ss") or w.endswith("us") or w.endswith("is"):
         return False
     return w.endswith("s")

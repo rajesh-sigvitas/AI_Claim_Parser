@@ -135,3 +135,17 @@ Implement AMBIGUOUS_AB.
 Implement NUMBER_MISMATCH and LIMITING_PREAMBLE.
 Add inherent-feature suppression.
 Add the term-grouping override dictionary.
+
+> **Implementation note (16 Sep 2026).** Section 4's tiering is implemented:
+> `Severity` carries INFO/WARNING/ERROR, `DEFAULT_SEVERITY` in
+> `app/analysis/models.py` maps each finding type to its tier, and
+> `AntecedentAnalysisResult.severity_summary` reports the three counts separately.
+> `LIMITING_PREAMBLE` is INFO as section 3.4 asks, but it is raised for every
+> preamble introduction rather than only where the term is re-used in the body,
+> because both ClaimMaster ground-truth reports do that. Section 3.3 is implemented
+> as `AMBIGUOUS_ANTECEDENT`, but not by the counting sketch this section gives --
+> see `docs/antecedent-evaluation.md`. Section 5's term-grouping overrides are
+> implemented in `app/analysis/antecedent/overrides.py`, configured by
+> `TERM_OVERRIDES_PATH` and inert when unset. Finding types keep the repository's
+> names (`MISSING_ANTECEDENT`, not `MISSING_AB`), and `REVERSE_ANTECEDENT` stays
+> ERROR rather than the optional WARNING of 3.6.

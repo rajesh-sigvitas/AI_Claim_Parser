@@ -23,6 +23,7 @@ from app.core.constants import InputType
 from app.document.models import Line, Page, PatentDocument, SectionKind
 from app.document.office import convert_to_pdf, suffix_for
 from app.document.paginator import paginate
+from app.document.revisions import claims_with_tracked_edits
 from app.document.sections import detect_sections
 
 # Lines per synthetic page for plain-text input.
@@ -45,6 +46,7 @@ class DocumentLoader:
 
         if self.parse_claims:
             document.claims = self._parse_claims(document)
+            self._attach_tracked_edits(document, raw_input, filename)
 
         if self.extract_figures and pdf_bytes:
             from app.document.figures import extract_figures
@@ -199,6 +201,39 @@ class DocumentLoader:
                     claim.metadata["page"] = line.page
                     claim.metadata["line"] = line.number
                     break
+
+
+    @staticmethod
+    def _attach_tracked_edits(document: PatentDocument, raw_input: bytes, filename: str) -> None:
+        """
+        Marks the claims that contain tracked insertions or deletions.
+
+        The .docx numbers its claims itself; the parsed claims come from the rendered
+        text.  The two are only lined up when they agree exactly -- same count, parsed
+        numbers consecutive -- because marking the wrong claim as amended would be a
+        false error, and an unmarked claim is merely a missed one.
+        """
+        if suffix_for(filename) != ".docx" or document.claims is None:
+            return
+        edits = claims_with_tracked_edits(raw_input)
+        if edits is None:
+            return
+
+        claims = document.claims.claims
+        numbers = [claim.number for claim in claims]
+        consecutive = bool(numbers) and numbers == list(range(numbers[0], numbers[0] + len(numbers)))
+        if edits.claim_count != len(claims) or not consecutive:
+            logger.warning(
+                f"Tracked-change claims ({edits.claim_count}) do not line up with parsed "
+                f"claims ({len(claims)}); amendment status not checked."
+            )
+            return
+
+        for position in edits.edited:
+            claims[position - 1].metadata["tracked_edits"] = True
+        document.claims.metadata["tracked_edit_claims"] = [
+            claims[position - 1].number for position in edits.edited
+        ]
 
 
 document_loader = DocumentLoader()

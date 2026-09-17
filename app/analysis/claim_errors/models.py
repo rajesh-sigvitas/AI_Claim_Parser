@@ -32,6 +32,9 @@ class ClaimIssueType(str, Enum):
     NON_SEQUENTIAL_NUMBERING = "NON_SEQUENTIAL_NUMBERING"
     NO_INDEPENDENT_CLAIM = "NO_INDEPENDENT_CLAIM"
 
+    # Amendment
+    AMENDED_WITHOUT_STATUS = "AMENDED_WITHOUT_STATUS"
+
     # Form
     MISSING_TRANSITION = "MISSING_TRANSITION"
     NO_TERMINAL_PERIOD = "NO_TERMINAL_PERIOD"
@@ -69,6 +72,7 @@ _LABELS = {
     ClaimIssueType.DUPLICATE_CLAIM_NUMBER: "Duplicate claim number",
     ClaimIssueType.NON_SEQUENTIAL_NUMBERING: "Claim numbering is not sequential",
     ClaimIssueType.NO_INDEPENDENT_CLAIM: "No independent claim",
+    ClaimIssueType.AMENDED_WITHOUT_STATUS: "Amended claim without a matching status identifier",
     ClaimIssueType.MISSING_TRANSITION: "No transitional phrase",
     ClaimIssueType.NO_TERMINAL_PERIOD: "Claim does not end with a period",
     ClaimIssueType.INTERNAL_PERIOD: "Claim contains more than one sentence",
@@ -92,6 +96,7 @@ _AUTHORITIES = {
     ClaimIssueType.DUPLICATE_CLAIM_NUMBER: "37 CFR 1.126",
     ClaimIssueType.NON_SEQUENTIAL_NUMBERING: "37 CFR 1.126",
     ClaimIssueType.NO_INDEPENDENT_CLAIM: "35 U.S.C. 112(b)",
+    ClaimIssueType.AMENDED_WITHOUT_STATUS: "37 CFR 1.121(c)",
     ClaimIssueType.MISSING_TRANSITION: "MPEP 2111.03",
     ClaimIssueType.NO_TERMINAL_PERIOD: "37 CFR 1.75(i); MPEP 608.01(m)",
     ClaimIssueType.INTERNAL_PERIOD: "MPEP 608.01(m)",

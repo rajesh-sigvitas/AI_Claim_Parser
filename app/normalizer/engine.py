@@ -88,11 +88,12 @@ class NormalizationEngine:
         # Then we join lines that don't look like they begin a new claim
         lines = text.split('\n')
         merged_lines = []
-        # A claim may open with a bare number ("12."), a renumbering ("12.[13.]") or a
-        # bracketed number alone ("[12.]", a claim cancelled by an amendment).  All three
-        # must survive as line starts, otherwise the splitter cannot see the boundary and
-        # the claim is merged into the one above it.
-        claim_start = re.compile(r'^\s*(?:claim\s+)?(?:\d+\s*\.(?!\d)|\[\s*\d+\s*\.?\s*\])', re.IGNORECASE)
+        # A claim may open with a bare number ("12.") or with the bracketed numbers a
+        # tracked-change rendering shows ("12.[13.]", "[12.]").  All must survive as line
+        # starts, otherwise the splitter cannot see the boundary and the claim is merged
+        # into the one above it.  The period is required in the bracketed form: paragraph
+        # numbers ("[0012]") have none and are not claims.
+        claim_start = re.compile(r'^\s*(?:claim\s+)?(?:\d+\s*\.(?!\d)|\[\s*\d+\s*\.\s*\])', re.IGNORECASE)
         
         for line in lines:
             stripped = line.strip()

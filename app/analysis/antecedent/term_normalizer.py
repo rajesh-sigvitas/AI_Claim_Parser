@@ -25,7 +25,8 @@ _IRREGULAR_PLURALS = {
     "women": "woman", "people": "person", "mice": "mouse", "geese": "goose",
     "media": "medium", "data": "datum", "axes": "axis", "bases": "basis",
     "analyses": "analysis", "matrices": "matrix", "indices": "index",
-    "vertices": "vertex", "apparatuses": "apparatus", "apparatus": "apparatus",
+    "vertices": "vertex", "vortices": "vortex", "apices": "apex",
+    "apparatuses": "apparatus", "apparatus": "apparatus",
     "series": "series", "species": "species", "means": "means",
 }
 
@@ -63,7 +64,7 @@ def singularize(word: str) -> str:
 # "a pair of" is already a determiner, so without this the reference ("pair of
 # distance sensor") could never match its own introduction ("distance sensor").
 _QUANTITY_NOUN_PREFIX = re.compile(
-    r"^(?:(?:pair|set|plurality|number|group|series|array)\s+of\s+)+", re.IGNORECASE
+    r"^(?:(?:pair|set|plurality|number|group|series|array|piece)\s+of\s+)+", re.IGNORECASE
 )
 
 
@@ -93,6 +94,9 @@ def normalize_term(surface_form: str) -> str:
     if not term:
         return ""
 
+    # A hyphen joins words; it does not make them one word.  "second-wheel assemblies"
+    # names wheel assemblies, and "a thrust bearing" is "the thrust-bearing".
+    term = re.sub(r"(?<=\w)-(?=\w)", " ", term)
     words = term.split(" ")
 
     # Deictic modifiers do not identify the element they qualify.

@@ -7,6 +7,7 @@ from typing import Dict, List, Tuple
 from app.analysis.antecedent.claim_walker import iter_claim_blocks
 from app.analysis.antecedent.plural_checker import check_number_agreement
 from app.analysis.antecedent.preamble_checker import check_limiting_preamble
+from app.analysis.antecedent.ambiguity import check_ambiguous_antecedents
 from app.analysis.antecedent.resolver import resolve_antecedents
 from app.analysis.antecedent.term_extractor import extract_terms_from_text
 from app.analysis.antecedent.term_registry import (
@@ -15,7 +16,12 @@ from app.analysis.antecedent.term_registry import (
     Occurrence,
     TermRegistry,
 )
-from app.analysis.models import AntecedentAnalysisResult, AntecedentFinding, FindingType
+from app.analysis.models import (
+    AntecedentAnalysisResult,
+    AntecedentFinding,
+    FindingType,
+    Severity,
+)
 from app.models.document import ClaimDocument
 
 # Section III of the Claim Master report covers four checks.  Two are defects in
@@ -25,14 +31,21 @@ from app.models.document import ClaimDocument
 # against a claim in the report.
 _TYPE_ORDER = {
     FindingType.MISSING_ANTECEDENT: 0,
-    FindingType.REVERSE_ANTECEDENT: 1,
-    FindingType.LIMITING_PREAMBLE: 2,
-    FindingType.SINGULAR_PLURAL: 3,
+    FindingType.AMBIGUOUS_ANTECEDENT: 1,
+    FindingType.REVERSE_ANTECEDENT: 2,
+    FindingType.POSSIBLY_MISSING_ANTECEDENT: 3,
+    FindingType.LIMITING_PREAMBLE: 4,
+    FindingType.SINGULAR_PLURAL: 5,
 }
 
 # The antecedent defects proper.  The standalone antecedent route reports only these;
 # the Claim Master report adds the two advisory checks alongside them.
-ANTECEDENT_ERROR_TYPES = (FindingType.MISSING_ANTECEDENT, FindingType.REVERSE_ANTECEDENT)
+ANTECEDENT_ERROR_TYPES = (
+    FindingType.MISSING_ANTECEDENT,
+    FindingType.AMBIGUOUS_ANTECEDENT,
+    FindingType.REVERSE_ANTECEDENT,
+    FindingType.POSSIBLY_MISSING_ANTECEDENT,
+)
 
 
 class AntecedentAnalyzer:
@@ -79,6 +92,7 @@ class AntecedentAnalyzer:
                         char_end=term.end_index,
                         is_implicit=term.is_implicit,
                         is_gerund=term.is_gerund,
+                        alternatives=list(term.alternatives),
                         spans=list(term.highlight_spans),
                     ))
 
@@ -99,11 +113,13 @@ class AntecedentAnalyzer:
         if not document.claims:
             return AntecedentAnalysisResult(
                 claim_count=0, total_findings=0, findings=[], summary={},
+                severity_summary={tier.value: 0 for tier in Severity},
             )
 
         registry, block_text = self.build_registry(document)
 
         findings: List[AntecedentFinding] = resolve_antecedents(registry, block_text)
+        findings += check_ambiguous_antecedents(registry, block_text)
         if not errors_only:
             findings.extend(check_limiting_preamble(registry, block_text))
             findings.extend(check_number_agreement(registry, block_text))
@@ -116,6 +132,10 @@ class AntecedentAnalyzer:
         ))
 
         summary = Counter(f.type.value for f in findings)
+        # All three tiers, always, so a caller reading severity_summary["ERROR"] gets a
+        # zero rather than a KeyError on a clean claim set.
+        by_severity = Counter(f.severity.value for f in findings)
+        severity_summary = {tier.value: by_severity.get(tier.value, 0) for tier in Severity}
 
         return AntecedentAnalysisResult(
             status="success",
@@ -124,4 +144,5 @@ class AntecedentAnalyzer:
             total_findings=len(findings),
             findings=findings,
             summary=dict(summary),
+            severity_summary=severity_summary,
         )

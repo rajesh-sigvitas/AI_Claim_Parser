@@ -13,6 +13,8 @@ from typing import Optional
 
 from loguru import logger
 
+from app.document.revisions import accept_tracked_changes, has_tracked_changes
+
 CONVERTIBLE_SUFFIXES = (".doc", ".docx", ".odt", ".rtf")
 
 _TIMEOUT_SECONDS = 120
@@ -25,7 +27,15 @@ def convert_to_pdf(raw_input: bytes, suffix: str = ".docx", timeout: int = _TIME
     A private user profile is used per call: LibreOffice refuses to start a second
     headless instance against a profile already in use, which is exactly what happens
     when two uploads are processed at once.
+
+    A .docx has its tracked changes accepted first.  LibreOffice would otherwise render
+    them -- deleted words beside inserted ones, shifted list numbers shown twice -- and
+    that rendering is what the claim parser would read.
     """
+    if suffix == ".docx" and has_tracked_changes(raw_input):
+        raw_input = accept_tracked_changes(raw_input)
+        logger.info("Tracked changes accepted before conversion.")
+
     with tempfile.TemporaryDirectory() as tmpdir:
         input_path = os.path.join(tmpdir, f"input{suffix}")
         with open(input_path, "wb") as handle:

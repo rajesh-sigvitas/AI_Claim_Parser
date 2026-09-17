@@ -289,8 +289,11 @@ def test_inherent_part_needs_no_antecedent(parser):
     a lid attached to the bottom of the housing.
     2. The system of claim 1, wherein a bracket passes through the open bottom of the housing.
     """
-    res = _analyze_text(parser, text)
-    terms = [f.term for f in res.findings]
+    res = _analyze_full(parser, text)
+    reported = ANTECEDENT_DEFECTS + (FindingType.POSSIBLY_MISSING_ANTECEDENT,)
+    terms = [f.term for f in res.findings if f.type in reported]
+    # Reported -- as "possibly missing": the housing it belongs to is introduced, so it
+    # may be an inherent feature (MPEP 2173.05(e)), which a reviewer has to confirm.
     assert "the open bottom" in terms
     assert not any("the bottom" == t for t in terms)
 
@@ -366,10 +369,47 @@ def test_limiting_preamble_skips_dependent_claims(parser):
 # -- number agreement -------------------------------------------------------
 
 
-def test_number_mismatch_is_reported_after_a_plurality_is_introduced(parser):
+def test_number_mismatch_is_reported_within_the_claim_chain(parser):
+    """Spec 3.5: nothing was recited singly, so "the suction conduit" points at nothing."""
+    text = """
+    What is claimed is:
+    1. A base assembly comprising a plurality of suction conduits.
+    2. The base assembly of claim 1, wherein the suction conduit forms a first airpath.
     """
-    Ground truth: the reference report flags claim 5 for "the primary suction conduit"
-    once claim 4 has recited "a plurality of suction conduits".
+    res = _analyze_full(parser, text)
+    mismatches = [f for f in res.findings if f.type == FindingType.SINGULAR_PLURAL]
+
+    assert len(mismatches) == 1
+    assert mismatches[0].claim_number == 2
+    assert mismatches[0].term == "the suction conduit"
+    assert "singular and plural forms" in mismatches[0].message
+
+
+def test_a_chain_that_introduces_both_numbers_contradicts_neither(parser):
+    """
+    The MID101312US claim 9 shape: the claim recites the set and draws a member out of
+    it, so a later singular reference has an introduction to point back at.  The real
+    ClaimMaster report does not flag claims 10 and 11.
+    """
+    text = """
+    What is claimed is:
+    9. A base assembly comprising a plurality of suction conduits, wherein a primary
+    suction conduit of the plurality of suction conduits is positioned at a first portion.
+    10. The base assembly of claim 9, wherein the primary suction conduit is adjacent to
+    a secondary suction conduit.
+    """
+    res = _analyze_full(parser, text)
+    assert [f for f in res.findings if f.type == FindingType.SINGULAR_PLURAL] == []
+
+
+def test_a_sibling_claims_plurality_does_not_put_a_claim_in_the_wrong(parser):
+    """
+    The same claims, except claim 5 depends on claim 1 rather than on claim 4, so the
+    plurality is in a sibling claim it never incorporates.
+
+    This is the MID101312US shape.  The real ClaimMaster report for that application
+    reports eleven section III findings, all limiting preambles, and does not flag
+    claim 5 -- a claim is measured against its own chain, not the whole claim set.
     """
     text = """
     What is claimed is:
@@ -381,12 +421,7 @@ def test_number_mismatch_is_reported_after_a_plurality_is_introduced(parser):
     airpath.
     """
     res = _analyze_full(parser, text)
-    mismatches = [f for f in res.findings if f.type == FindingType.SINGULAR_PLURAL]
-
-    assert len(mismatches) == 1
-    assert mismatches[0].claim_number == 5
-    assert mismatches[0].term == "the primary suction conduit"
-    assert "singular and plural forms" in mismatches[0].message
+    assert [f for f in res.findings if f.type == FindingType.SINGULAR_PLURAL] == []
 
 
 def test_a_claim_drawing_a_member_from_its_plurality_is_not_a_mismatch(parser):
@@ -405,16 +440,14 @@ def test_one_number_mismatch_is_reported_per_claim(parser):
     """Related terms mismatch together; the rest are recorded as evidence."""
     text = """
     What is claimed is:
-    1. A base assembly comprising a primary suction conduit and a primary suction nozzle.
-    4. The base assembly of claim 1, further comprising a plurality of suction conduits
-    and a plurality of suction nozzles, wherein a suction conduit of the plurality of
-    suction conduits is coupled to a suction nozzle of the plurality of suction nozzles.
-    5. The base assembly of claim 1, wherein the primary suction conduit is coupled to
-    the primary suction nozzle.
+    1. A base assembly comprising a plurality of suction conduits and a plurality of
+    suction nozzles.
+    2. The base assembly of claim 1, wherein the suction conduit is coupled to the
+    suction nozzle.
     """
     res = _analyze_full(parser, text)
     mismatches = [f for f in res.findings if f.type == FindingType.SINGULAR_PLURAL]
 
     assert len(mismatches) == 1
-    assert mismatches[0].claim_number == 5
+    assert mismatches[0].claim_number == 2
     assert mismatches[0].evidence.get("also")

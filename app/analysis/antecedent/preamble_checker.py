@@ -18,10 +18,10 @@ from typing import Dict, List, Tuple
 from app.analysis.antecedent.claim_walker import HEADER_INDEX
 from app.analysis.antecedent.term_registry import INTRODUCTION, Occurrence, TermRegistry
 from app.analysis.models import (
+    DEFAULT_SEVERITY,
     AntecedentFinding,
     FindingLocation,
     FindingType,
-    Severity,
 )
 from app.core.constants import ClaimType
 
@@ -86,7 +86,7 @@ def _finding(
     )
     return AntecedentFinding(
         type=FindingType.LIMITING_PREAMBLE,
-        severity=Severity.WARNING,
+        severity=DEFAULT_SEVERITY[FindingType.LIMITING_PREAMBLE],
         claim_number=occurrence.claim_number,
         term=term,
         message=_MESSAGE.format(term=term),

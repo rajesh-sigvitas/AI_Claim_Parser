@@ -8,9 +8,12 @@ reference carries one, a footnote explaining how to read it.
 Conventions worth stating:
 
 * Every analysed section opens with a status banner.  Green means the section was checked
-  and nothing was found ("No errors found for this section."); red or amber means it found
-  something, and the banner lists what, so a reader can triage the report from the banners
-  alone.  The contents page repeats the same verdicts as a summary table.
+  and nothing was found ("No errors found for this section."); red, amber or blue means it
+  found something, and the banner lists what, so a reader can triage the report from the
+  banners alone.  The colour is the highest tier present -- red for an error, amber for a
+  warning, blue where every finding is a note -- and the tiers are counted separately, so
+  a section of eleven limiting preambles does not announce eleven errors.  The contents
+  page repeats the same verdicts as a summary table.
 * A section whose analyser has not run says it was not analysed.  "Nothing found" and
   "not checked" are different statements and the report never blurs them.
 * Section III prints the claim and its findings side by side, with ``{1}``-style markers
@@ -74,9 +77,12 @@ MARKER_HANG = 18.0
 # A section III row taller than the space left splits inside the row rather than moving
 # whole to the next page.  ReportLab's default tries a between-rows split first, which
 # places the remainder -- repeated header and all -- on the same page, printing a header
-# row mid-page.  The value is also the smallest fragment, in points, either half may be,
-# so a row never leaves a one-line sliver at the foot of a page.
-ROW_SPLIT = dict(splitByRow=0, splitInRow=40)
+# row mid-page.
+# splitInRow is also ReportLab's minimum height for either half of a split row.  At 40 a
+# claim overflowing the page by less than 40pt could not split at all -- and could not
+# fit on the next page either -- so the report raised LayoutError.  1 accepts any split;
+# a half with no content is still refused (the table then moves to the next page).
+ROW_SPLIT = dict(splitByRow=0, splitInRow=1)
 
 NO_ERRORS_TEXT = "No errors found for this section."
 
@@ -84,6 +90,7 @@ NO_ERRORS_TEXT = "No errors found for this section."
 _OK = ("#1E7B34", "#EAF6EC")
 _ERROR = ("#B3261E", "#FDECEA")
 _WARNING = ("#9A5B00", "#FFF4E0")
+_INFO = ("#1F4E8C", "#EAF1FB")
 _PENDING = ("#666666", "#F2F2F2")
 
 _SYMBOL_FONT = "CMSymbols"
@@ -103,12 +110,13 @@ def _status_icons() -> Dict[str, str]:
             pdfmetrics.registerFont(TTFont(_SYMBOL_FONT, str(_SYMBOL_FONT_PATH)))
     except Exception as error:                       # pragma: no cover - font missing
         logger.warning(f"Status glyph font unavailable ({error}); using text markers.")
-        return {"ok": "[OK]", "error": "[X]", "warning": "[!]"}
+        return {"ok": "[OK]", "error": "[X]", "warning": "[!]", "info": "[i]"}
 
     return {
         "ok": f'<font name="{_SYMBOL_FONT}">\u2714</font>',
         "error": f'<font name="{_SYMBOL_FONT}">\u2718</font>',
         "warning": f'<font name="{_SYMBOL_FONT}">\u26A0</font>',
+        "info": f'<font name="{_SYMBOL_FONT}">\u2139</font>',
     }
 
 
@@ -136,12 +144,15 @@ _FOOTNOTE_NUMBER = {
 _SEVERITY_COLOR = {
     Severity.ERROR: _ERROR[0],
     Severity.WARNING: _WARNING[0],
+    Severity.INFO: _INFO[0],
 }
 
 # How each section III finding type is named in the report, in the order they are listed.
 _ANTECEDENT_LABELS = {
     FindingType.MISSING_ANTECEDENT: "Missing antecedent basis",
+    FindingType.AMBIGUOUS_ANTECEDENT: "Ambiguous antecedent basis",
     FindingType.REVERSE_ANTECEDENT: "Reverse antecedent",
+    FindingType.POSSIBLY_MISSING_ANTECEDENT: "Possibly missing antecedent basis?",
     FindingType.LIMITING_PREAMBLE: "Limiting preamble?",
     FindingType.SINGULAR_PLURAL: "Singular/plural mismatch?",
 }
@@ -160,13 +171,14 @@ _ANALYSED_SECTIONS = (
 class SectionStatus:
     """The verdict a section's banner and the summary table print."""
 
-    kind: str                              # "ok" | "error" | "warning" | "pending"
+    kind: str                    # "ok" | "error" | "warning" | "info" | "pending"
     headline: str
     details: List[str] = field(default_factory=list)
 
     @property
     def colors(self) -> Tuple[str, str]:
-        return {"ok": _OK, "error": _ERROR, "warning": _WARNING}.get(self.kind, _PENDING)
+        return {"ok": _OK, "error": _ERROR, "warning": _WARNING,
+                "info": _INFO}.get(self.kind, _PENDING)
 
 
 def section_status(report: CMReport, section: ReportSection) -> SectionStatus:
@@ -247,7 +259,8 @@ def _antecedent_status(result) -> SectionStatus:
         return SectionStatus("ok", NO_ERRORS_TEXT)
 
     errors = sum(1 for f in result.findings if f.severity == Severity.ERROR)
-    warnings = len(result.findings) - errors
+    warnings = sum(1 for f in result.findings if f.severity == Severity.WARNING)
+    notes = sum(1 for f in result.findings if f.severity == Severity.INFO)
 
     details = []
     for finding_type, label in _ANTECEDENT_LABELS.items():
@@ -258,9 +271,11 @@ def _antecedent_status(result) -> SectionStatus:
         noun = "claim" if len(numbers) == 1 else "claims"
         details.append(f"{label.rstrip('?')}: {len(claims)} in {noun} {_compress(numbers)}")
 
+    # A section whose findings are all notes must not be announced as errors.
+    kind = "error" if errors else "warning" if warnings else "info"
     return SectionStatus(
-        "error" if errors else "warning",
-        f"{_counts(errors, warnings)} found.",
+        kind,
+        f"{_counts(errors, warnings, notes)} found.",
         details,
     )
 
@@ -286,13 +301,25 @@ def _plural(count: int, noun: str) -> str:
     return f"{count} {noun}" + ("" if count == 1 else "s")
 
 
-def _counts(errors: int, warnings: int) -> str:
+def _counts(errors: int, warnings: int, notes: int = 0) -> str:
+    """
+    "1 error and 6 warnings", "11 notes".
+
+    The tiers are listed separately and never added up: eleven limiting preambles are
+    eleven things to look at, not eleven problems (spec section 4).
+    """
     parts = []
     if errors:
         parts.append(_plural(errors, "error"))
     if warnings:
         parts.append(_plural(warnings, "warning"))
-    return " and ".join(parts) or "No issues"
+    if notes:
+        parts.append(_plural(notes, "note"))
+    if not parts:
+        return "No issues"
+    if len(parts) == 1:
+        return parts[0]
+    return ", ".join(parts[:-1]) + " and " + parts[-1]
 
 
 def _compress(numbers: Iterable[int]) -> str:
@@ -880,9 +907,11 @@ class CMReportGenerator:
         for claim_number in flagged:
             findings = [f for f in result.findings if f.claim_number == claim_number]
             numbering = {id(finding): position for position, finding in enumerate(findings, 1)}
+            # Every cell is a list of flowables: ReportLab can split a list across pages
+            # (splitInRow), but treats a bare flowable as unsplittable content.
             rows.append([
-                self._claim_cell(claims[claim_number], findings, numbering,
-                                 number_width, inner_width),
+                [self._claim_cell(claims[claim_number], findings, numbering,
+                                  number_width, inner_width)],
                 self._findings_cell(findings, numbering,
                                     self._dependency_note(report, claim_number)),
             ])
@@ -934,7 +963,8 @@ class CMReportGenerator:
             text.append(Paragraph(marked, self._claim_style(block.level, has_marker)))
 
         cell = Table(
-            [[Paragraph(f"{claim.number}.", self.styles["ClaimText"]), text or ""]],
+            # Lists, not bare flowables, so a claim taller than a page splits in-row.
+            [[[Paragraph(f"{claim.number}.", self.styles["ClaimText"])], text or [""]]],
             colWidths=[number_width, width - number_width],
             **ROW_SPLIT,
         )

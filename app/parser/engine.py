@@ -66,12 +66,10 @@ class ParserEngine:
             )
         logger.info(f"Claim splitter found {len(raw_claims)} claims.")
 
-        # Validate sequential numbering for confidence.  Cancelled claims are excluded:
-        # their numbers repeat the live claims renumbered into them, so counting them
-        # would make every amended claim set look non-sequential.
-        live = [rc for rc in raw_claims if not rc.deleted]
-        expected = list(range(live[0].number, live[0].number + len(live))) if live else []
-        actual = [rc.number for rc in live]
+        # Validate sequential numbering for confidence.  A cancelled claim keeps its
+        # number, so it still counts towards the sequence.
+        expected = list(range(raw_claims[0].number, raw_claims[0].number + len(raw_claims)))
+        actual = [rc.number for rc in raw_claims]
         if actual == expected:
             module_scores["claim_detection"] = 100.0
         else:
@@ -83,7 +81,7 @@ class ParserEngine:
         claims, cancelled = self.hierarchy_builder.build_with_cancelled(raw_claims)
         logger.info(f"Hierarchy builder produced {len(claims)} Claim objects.")
         if cancelled:
-            logger.info(f"Cancelled claims found in amendment markup: {cancelled}")
+            logger.info(f"Claims marked (Canceled): {cancelled}")
 
         # ── Step 4: Confidence scoring ──
         # Score dependency detection

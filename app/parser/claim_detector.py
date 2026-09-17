@@ -7,6 +7,16 @@ import re
 from typing import Optional
 from app.parser.patterns import CLAIM_STATEMENT_PATTERN
 
+# The explicit claim statements, matched anywhere in a line.  Line merging can join the
+# statement to the text before it ("... CLAIM What is claimed is: 1. ..."); the
+# line-anchored pattern then finds nothing and the whole document, specification
+# included, is parsed as claims.  The last occurrence is taken, since the claims follow
+# the description.
+_INLINE_STATEMENT = re.compile(
+    r"\b(?:what\s+is\s+claimed\s+is|the\s+invention\s+claimed\s+is|we\s+claim|i\s+claim)\s*[:.]",
+    re.IGNORECASE,
+)
+
 
 class ClaimStatementDetector:
     """
@@ -22,4 +32,8 @@ class ClaimStatementDetector:
         match = CLAIM_STATEMENT_PATTERN.search(text)
         if match:
             return text[match.end():].strip()
+
+        inline = list(_INLINE_STATEMENT.finditer(text))
+        if inline:
+            return text[inline[-1].end():].strip()
         return text.strip()
